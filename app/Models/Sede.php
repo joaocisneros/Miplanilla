@@ -3,31 +3,27 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use OwenIt\Auditing\Contracts\Auditable;
 
-class Empresa extends Model implements Auditable
+class Sede extends Model implements Auditable
 {
     use \OwenIt\Auditing\Auditable;
 
-    protected $table = 'empresas';
+    protected $table = 'sedes';
 
     protected $fillable = [
-        'ruc', 'razon_social', 'nombre_comercial', 'direccion', 'activo',
+        'empresa_id', 'nombre', 'direccion', 'activo',
     ];
 
     protected $casts = [
         'activo' => 'boolean',
     ];
 
-    public function sedes(): HasMany
+    public function empresa(): BelongsTo
     {
-        return $this->hasMany(Sede::class);
-    }
-
-    public function areas(): HasMany
-    {
-        return $this->hasMany(Area::class);
+        return $this->belongsTo(Empresa::class);
     }
 
     public function empleados(): HasMany

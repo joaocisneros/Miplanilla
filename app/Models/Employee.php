@@ -15,7 +15,7 @@ class Employee extends Model implements Auditable
     protected $table = 'employees';
 
     protected $fillable = [
-        'empresa_id',
+        'empresa_id', 'sede_id',
         'apellido_paterno', 'apellido_materno', 'nombres',
         'tipo_documento', 'numero_documento', 'ruc',
         'fecha_nacimiento', 'genero', 'estado_civil', 'lugar_nacimiento', 'profesion',
@@ -39,6 +39,11 @@ class Employee extends Model implements Auditable
     public function empresa(): BelongsTo
     {
         return $this->belongsTo(Empresa::class);
+    }
+
+    public function sede(): BelongsTo
+    {
+        return $this->belongsTo(Sede::class);
     }
 
     public function contratos(): HasMany

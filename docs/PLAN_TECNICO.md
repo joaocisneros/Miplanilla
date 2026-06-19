@@ -37,6 +37,16 @@ ellas. Distinción clave:
 > Implementado en Fase 0: tabla `empresas`; `empresa_id` en `areas` y `employees`. Pendiente:
 > agregar `empresa_id` a `periodos`/`planillas` y aplicar un *global scope* de empresa activa.
 
+**Respuestas del cliente (confirmadas):**
+- **2 o más empresas** → multi-empresa activo desde el inicio.
+- **No comparten trabajadores** → `employees.empresa_id` (1 empresa por empleado) es correcto.
+- **Un solo operador maneja todas las empresas** → se requiere un **selector de empresa
+  activa** en la UI; el operador ve todas y cambia entre ellas (sin aislamiento por usuario,
+  pero los datos de cada empresa nunca se mezclan).
+- **Solo 1 empresa tiene reloj biométrico; todas envían asistencia en Excel** → la
+  **importación por Excel/CSV es la vía principal** de asistencia; el conector del reloj
+  físico es secundario (una sola empresa).
+
 ## 2. Roles y permisos
 
 | Rol | Capacidades |
