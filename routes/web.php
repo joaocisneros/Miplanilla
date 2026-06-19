@@ -1,6 +1,9 @@
 <?php
 
+use App\Http\Controllers\Admin\ConceptoController;
 use App\Http\Controllers\Admin\EmpresaController;
+use App\Http\Controllers\Admin\ParametroPeriodoController;
+use App\Http\Controllers\Admin\TasaAfpController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -31,6 +34,19 @@ Route::middleware(['auth', 'role:ADMIN'])->prefix('admin')->name('admin.')->grou
     Route::post('empresas', [EmpresaController::class, 'store'])->name('empresas.store');
     Route::put('empresas/{empresa}', [EmpresaController::class, 'update'])->name('empresas.update');
     Route::delete('empresas/{empresa}', [EmpresaController::class, 'destroy'])->name('empresas.destroy');
+
+    // Maestros (configuración de reglas)
+    Route::get('parametros', [ParametroPeriodoController::class, 'index'])->name('parametros.index');
+    Route::post('parametros', [ParametroPeriodoController::class, 'store'])->name('parametros.store');
+    Route::put('parametros/{parametro}', [ParametroPeriodoController::class, 'update'])->name('parametros.update');
+
+    Route::get('tasas-afp', [TasaAfpController::class, 'index'])->name('tasas-afp.index');
+    Route::post('tasas-afp', [TasaAfpController::class, 'store'])->name('tasas-afp.store');
+    Route::put('tasas-afp/{tasa}', [TasaAfpController::class, 'update'])->name('tasas-afp.update');
+    Route::delete('tasas-afp/{tasa}', [TasaAfpController::class, 'destroy'])->name('tasas-afp.destroy');
+
+    Route::get('conceptos', [ConceptoController::class, 'index'])->name('conceptos.index');
+    Route::put('conceptos/{concepto}', [ConceptoController::class, 'update'])->name('conceptos.update');
 });
 
 require __DIR__.'/auth.php';

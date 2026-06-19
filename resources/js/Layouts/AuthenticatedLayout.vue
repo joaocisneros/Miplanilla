@@ -50,6 +50,27 @@ const esAdmin = computed(() => roles.value.includes('ADMIN'));
                                 >
                                     Empresas
                                 </NavLink>
+                                <NavLink
+                                    v-if="esAdmin"
+                                    :href="route('admin.parametros.index')"
+                                    :active="route().current('admin.parametros.*')"
+                                >
+                                    Parámetros
+                                </NavLink>
+                                <NavLink
+                                    v-if="esAdmin"
+                                    :href="route('admin.tasas-afp.index')"
+                                    :active="route().current('admin.tasas-afp.*')"
+                                >
+                                    Tasas AFP
+                                </NavLink>
+                                <NavLink
+                                    v-if="esAdmin"
+                                    :href="route('admin.conceptos.index')"
+                                    :active="route().current('admin.conceptos.*')"
+                                >
+                                    Conceptos
+                                </NavLink>
                             </div>
                         </div>
 
