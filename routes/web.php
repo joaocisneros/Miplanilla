@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\ParametroPeriodoController;
 use App\Http\Controllers\Admin\SedeController;
 use App\Http\Controllers\Admin\TasaAfpController;
 use App\Http\Controllers\ContextoController;
+use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -32,6 +33,16 @@ Route::middleware('auth')->group(function () {
     // Contexto: empresa/sede activa
     Route::post('/contexto/empresa', [ContextoController::class, 'setEmpresa'])->name('contexto.empresa');
     Route::post('/contexto/sede', [ContextoController::class, 'setSede'])->name('contexto.sede');
+
+    // Empleados (RRHH/ADMIN gestionan; SUPERVISOR solo ve)
+    Route::get('empleados', [EmployeeController::class, 'index'])->middleware('permission:empleados.ver')->name('empleados.index');
+    Route::middleware('permission:empleados.gestionar')->group(function () {
+        Route::get('empleados/nuevo', [EmployeeController::class, 'create'])->name('empleados.create');
+        Route::post('empleados', [EmployeeController::class, 'store'])->name('empleados.store');
+        Route::get('empleados/{empleado}/editar', [EmployeeController::class, 'edit'])->name('empleados.edit');
+        Route::put('empleados/{empleado}', [EmployeeController::class, 'update'])->name('empleados.update');
+        Route::delete('empleados/{empleado}', [EmployeeController::class, 'destroy'])->name('empleados.destroy');
+    });
 });
 
 // Panel de administración (solo rol ADMIN)

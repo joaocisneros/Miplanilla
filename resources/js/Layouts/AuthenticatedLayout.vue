@@ -14,6 +14,9 @@ const page = usePage();
 const roles = computed(() => page.props.auth?.roles ?? []);
 const esAdmin = computed(() => roles.value.includes('ADMIN'));
 
+const permisos = computed(() => page.props.auth?.permissions ?? []);
+const puedeVerEmpleados = computed(() => permisos.value.includes('empleados.ver'));
+
 const contexto = computed(() => page.props.contexto ?? { empresas: [], sedes: [], empresa_id: null, sede_id: null });
 
 function cambiarEmpresa(e) {
@@ -52,6 +55,13 @@ function cambiarSede(e) {
                                     :active="route().current('dashboard')"
                                 >
                                     Dashboard
+                                </NavLink>
+                                <NavLink
+                                    v-if="puedeVerEmpleados"
+                                    :href="route('empleados.index')"
+                                    :active="route().current('empleados.*')"
+                                >
+                                    Empleados
                                 </NavLink>
                                 <NavLink
                                     v-if="esAdmin"
