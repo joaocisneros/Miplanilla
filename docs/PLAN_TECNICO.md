@@ -10,7 +10,7 @@
 
 | Capa | Elección | Motivo |
 |------|----------|--------|
-| Backend | **Laravel 11 / PHP 8.2+** | Maduro, Eloquent, colas, políticas de autorización. (El prompt dice "PHP 10+"; la versión actual de PHP es 8.x — Laravel 11 sobre PHP 8.2 es lo correcto). |
+| Backend | **Laravel 12 / PHP 8.2+** | Versión instalada: Laravel 12.62. (El prompt dice "PHP 10+"; la versión actual de PHP es 8.x — Laravel 12 sobre PHP 8.2 es lo correcto). ⚠️ El PHP CLI por defecto del equipo es 8.0.30; se debe usar explícitamente el binario PHP 8.2.31 de Laragon. |
 | Frontend | **Vue 3 + Inertia.js** | SPA sin construir API doble; un solo despliegue. Alternativa: Vue/React + API REST pura si se requiere desacople total. |
 | Base de datos | **MySQL 8** | Disponible en Laragon; el entorno ya usa MySQL. PostgreSQL viable sin cambios de código relevantes. |
 | Autenticación | **Laravel Breeze/Fortify + Sanctum** | Sesión web (Inertia) + tokens para API biométrica. |
@@ -68,7 +68,11 @@ app/
 ### 4.2 Maestros versionados (críticos para cálculo histórico)
 - `parametros_periodo` (anio, uit, rmv, asignacion_familiar, dias_base=30, vigente_desde)
 - `tasas_afp` (afp, tipo[mixta|sueldo], comision_flujo, comision_saldo, prima_seguro, aporte_obligatorio=0.10, rem_max, vigente_desde)
-- `tasas_aportes` (essalud=0.09, sctr_pension=0.0214, svl=0.0054, senati, vigente_desde)
+- `tasas_aportes` (essalud=0.09, senati, vigente_desde)
+- `polizas_sctr` (aseguradora, actividad_riesgo, tasa_salud, tasa_pension, vigente_desde) — por póliza, NO universal
+- `polizas_vida_ley` (aseguradora, prima/tasa, base, vigente_desde) — por póliza, NO 0.54% universal
+- `parametros_periodo` (anio, uit, rmv=1130(2026), asignacion_familiar=113, dias_base=30, vigente_desde)
+- `retenciones_5ta` (employee_id, anio, mes, monto_retenido) — estado acumulado para 5ta categoría SUNAT
 - `tramos_renta_5ta` (orden, hasta_uit, tasa, vigente_desde)
 
 ### 4.3 Empleados

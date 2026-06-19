@@ -32,12 +32,19 @@ ASISTENCIA            HOJA RXH                  1RA QUINCENA JUNIO 26 (PLANILLA)
 | `quinta categoria` | Cálculo de renta de 5ta categoría (proyección anual, 7 UIT, escala progresiva) | B1:K20 |
 | `Tabla` | Comisiones AFP (fija/flujo/mixta), asignación familiar, RMV, límites | A1:M11 |
 
-**Constantes globales detectadas:**
-- Días base del mes para prorrateo: **30** (celda `$C$3` de la planilla).
-- Quincena = **15 días**.
-- UIT (2026 en el archivo): **S/ 5,500** (`quinta categoria!G18`).
-- RMV: **S/ 1,025** (`Tabla!D11`).
-- Asignación familiar: **10% de RMV = S/ 102.50** (`Tabla`).
+**Constantes globales — ⚠️ valores del Excel vs. valores vigentes 2026:**
+
+| Parámetro | Valor en el Excel (desactualizado) | **Valor correcto a usar (vigente 2026)** |
+|-----------|-----------------------------------|------------------------------------------|
+| Días base prorrateo | 30 (`$C$3`) | 30 |
+| Quincena | 15 días | 15 días |
+| UIT | S/ 5,500 (`quinta categoria!G18`) | confirmar UIT 2026 con MEF/SUNAT |
+| RMV | S/ 1,025 (`Tabla!D11`) | **S/ 1,130** |
+| Asignación familiar (10% RMV) | S/ 102.50 | **S/ 113.00** |
+
+> Estos valores **NO se hardcodean**: viven en `parametros_periodo` versionados por vigencia.
+> El Excel usa cifras viejas (RMV 1,025 / AF 102.50); la planilla operativa real usa
+> RMV 1,130 / AF 113. Todo parámetro debe confirmarse con el contador y fecharse.
 
 ---
 
@@ -114,6 +121,27 @@ se importa desde el dispositivo. Esto reemplaza la captura manual del Excel ASIS
 > Pendiente confirmar: **marca y modelo del biométrico** y cómo expone los datos
 > (BD directa, archivo de export, o API), para definir el conector concreto.
 
+**Campos esenciales de `marcaciones` (requisitos firmes para trazabilidad):**
+- `hash_unico` — hash de (device + código_trabajador + fecha_hora + tipo) para **evitar
+  duplicados** en reimportaciones (índice único).
+- `codigo_trabajador_origen` — el código tal cual viene del reloj (no el `employee_id` interno).
+- `device_id` / `codigo_dispositivo_origen` — qué reloj generó la marca.
+- `fecha_hora_marca` (hora local del evento) + `zona_horaria` + `fecha_hora_recepcion`
+  (cuándo la recibió el sistema).
+- `tipo` (entrada/salida/desconocido) y `metodo` (huella/rostro/tarjeta).
+- `raw_payload` — registro original íntegro del reloj (conservación del original).
+- `procesada` (bool) — si ya se consolidó en `attendance`.
+
+**Reglas operativas a definir (requisitos firmes):**
+- **Política de marcas incompletas/múltiples:** qué hacer si falta entrada o salida, o si hay
+  marcas repetidas el mismo día (tomar primera/última, marcar incidencia, etc.).
+- **Calendarios:** feriados nacionales/locales, descansos semanales, días no laborables.
+- **Turnos nocturnos:** jornadas que cruzan medianoche (entrada un día, salida el siguiente).
+- **Flujo formal de aprobación de horas extras:** las HE solo se pagan si fueron **autorizadas**
+  (solicitud → aprobación supervisor/RRHH) antes de entrar al cálculo.
+- **Conservación:** `marcaciones` y `raw_payload` inmutables; toda corrección vía `incidencias`
+  + `audit_logs`, conservando el registro original.
+
 ---
 
 ## 3. Hoja HOJA RXH (consolidación por empleado)
@@ -138,6 +166,13 @@ Toma los agregados de ASISTENCIA y los presenta por empleado en columnas
 ---
 
 ## 4. Hoja PLANILLA (cálculo principal) — mapa de columnas
+
+> 🛑 **ESTA SECCIÓN DOCUMENTA LO QUE HACE EL EXCEL, INCLUIDOS SUS ERRORES.**
+> NO es la regla a implementar. Sirve solo para entender el origen y la estructura.
+> Las **reglas correctas** a programar están en **§9.1 (correcciones), §9.2 (naturaleza
+> remunerativa) y §9.3 (horas extras)**. Donde §4 y §9 difieran, **manda §9**.
+> En particular son INCORRECTOS aquí: horas extras (`AN = T/30/10`), base de aportes
+> (solo `AJ`), descuentos que mezclan movilidad, y `días = 15 − faltas`.
 
 Cada fila es un trabajador. Leyenda: `P/Q/R/S` = componentes del sueldo, `AJ` =
 remuneración quincenal base, `AR` = adicionales quincenales, `BA` = retención al
@@ -166,7 +201,7 @@ trabajador, `BC` = neto, `BD..BG` = aportes del empleador.
 | Col | Campo | Fórmula |
 |-----|-------|---------|
 | P | Sueldo básico | (dato) |
-| Q | Asignación familiar | (dato — S/ 102.50 si aplica) |
+| Q | Asignación familiar | (dato — S/ 113.00 vigente 2026 si aplica) |
 | R | Movilidad | (dato) |
 | S | Por fuera | (dato) |
 | **T** | **Total mensual** | `=P+Q+R+S` |
@@ -258,11 +293,36 @@ G7  Renta neta gravable                  = MAX(G5 - G6, 0)
 
 ```
 G15 Impuesto anual = SUMA(impuesto de cada tramo afecto)
-G17 Retención mensual = G15 / 12
+G17 Retención mensual = G15 / 12   ← ⚠️ SIMPLIFICACIÓN INCORRECTA del Excel
 ```
 
-> Implementación: función `calcularImpuesto5ta(rentaNetaGravable, uit)` que recorra los
-> tramos. UIT debe venir de la **tabla maestra del periodo**, no hardcodeada.
+> ⚠️ **El Excel divide el impuesto anual entre 12, lo cual NO es el procedimiento legal.**
+
+### 5.1 Procedimiento correcto SUNAT (a implementar)
+
+La retención es **acumulada y progresiva por mes**, según el procedimiento del art. 40 del
+Reglamento de la LIR. Resumen del algoritmo mensual:
+
+1. **Proyectar** la remuneración anual: remuneración del mes × meses que faltan (incluido el
+   actual) + gratificaciones que correspondan + remuneraciones ya percibidas en el año +
+   retenciones/ingresos previos.
+2. Restar **7 UIT** → renta neta proyectada.
+3. Aplicar la **escala progresiva** (8/14/17/20/30%) → impuesto anual proyectado.
+4. Determinar la **fracción del impuesto** que corresponde al mes según la tabla de divisores
+   SUNAT por mes (ene–mar: /12; abr: /9; may–jul: /8; ago: /5; etc.), **restando lo ya
+   retenido en meses anteriores** del año.
+5. En meses con ingresos extraordinarios (gratif., utilidades, bonificaciones) se aplica el
+   procedimiento adicional sobre ese extraordinario.
+
+> Implementación: `Renta5taService` que mantenga **retenciones acumuladas** por trabajador y
+> por año (tabla `retenciones_5ta` o columna acumulada), no un simple /12. UIT desde
+> `parametros_periodo`. Esto es un requisito firme: el motor necesita estado acumulado anual.
+
+### 5.2 Particularidad de planilla quincenal
+
+Como se paga en quincenas, la retención mensual de 5ta se **prorratea/aplica** según política
+(toda en la 2da quincena, o mitad y mitad). Definir con el contador. El cálculo del impuesto
+es **mensual**; la quincena solo decide cuándo se descuenta.
 
 ---
 
@@ -292,7 +352,8 @@ Valores de ejemplo (al devengue del archivo):
 > ⚠️ Hay un `#REF!` en una definición de `TAB_AFP` en el Excel — síntoma de fragilidad
 > que justifica la migración. En BD: tabla `tasas_afp` versionada por periodo de devengue.
 
-**Asignación familiar** (`Tabla`): `RMV(1025) × 10% = 102.50`.
+**Asignación familiar** (`Tabla`): `RMV × 10%`. En el Excel = `1025 × 10% = 102.50`
+(desactualizado); **vigente 2026 = `1130 × 10% = 113.00`**.
 
 ---
 
@@ -349,7 +410,7 @@ aporta SCTR (sí/no), seguro de vida, sueldo básico, movilidad, otros, cargo/ac
 sexo, fecha de nacimiento, otro domicilio). → tabla `derechohabientes`.
 
 > ⭐ **Regla clave:** los **datos de hijos** determinan la **asignación familiar** (columna Q de
-> la planilla = 10% RMV = S/ 102.50): aplica si el trabajador tiene hijos menores de 18 años
+> la planilla = 10% RMV = S/ 113.00 vigente 2026): aplica si el trabajador tiene hijos menores de 18 años
 > (o hasta 24 si estudian estudios superiores). Se deriva automáticamente de `derechohabientes`.
 
 **Contacto de emergencia:** apellidos y nombres, teléfono, parentesco.
@@ -364,7 +425,9 @@ por, puesto nuevo / reemplazo. → metadatos de contratación (opcional).
 **Maestros versionados por periodo (clave para no romper cálculos históricos):**
 - `parametros_periodo` (uit, rmv, asignacion_familiar, dias_base=30)
 - `tasas_afp` (afp, tipo[mixta/sueldo], comision_flujo, comision_saldo, prima_seguro, aporte_obligatorio, rem_max, vigente_desde)
-- `tasas_aportes` (essalud=0.09, sctr_pension=0.0214, svl=0.0054, senati, vigente_desde)
+- `tasas_aportes` (essalud=0.09, senati, vigente_desde)
+- `polizas_sctr` (aseguradora, actividad_riesgo, tasa_salud, tasa_pension, vigente_desde) — NO tasa universal
+- `polizas_vida_ley` (aseguradora, prima/tasa, base, vigente_desde) — NO 0.54% universal
 - `tramos_renta_5ta` (orden, tope_uit, tasa, vigente_desde)
 
 **Operativos:**
@@ -446,6 +509,40 @@ HE primeras 2h    = valor_hora × 1.25 × horas
 HE desde la 3ra h = valor_hora × 1.35 × horas
 ```
 Las horas provienen de `marcaciones` (salida real − salida esperada del turno), no de un conteo de días.
+
+## 9.4 SCTR y Seguro Vida Ley — por póliza, riesgo y vigencia (no tasas universales)
+
+> ⚠️ El Excel usa SCTR 2.14% y Vida Ley 0.54% como **tasas fijas universales**. Es incorrecto.
+
+- **SCTR (Seguro Complementario de Trabajo de Riesgo):** la tasa depende de la **póliza
+  contratada** (aseguradora/EPS), el **nivel de riesgo de la actividad** y su **vigencia**.
+  Tiene componente **Salud** y componente **Pensión**, con tasas distintas. Solo aplica a
+  trabajadores en actividades de riesgo.
+  → Tabla `polizas_sctr` (aseguradora, tasa_salud, tasa_pension, actividad/riesgo, vigencia).
+- **Seguro Vida Ley (DL 688):** prima según **póliza** y base (remuneración asegurable), no un
+  0.54% universal. Obligatorio desde el primer día de trabajo (Ley 29549).
+  → Tabla `polizas_vida_ley` (aseguradora, tasa/prima, base, vigencia).
+
+El cálculo toma la póliza vigente asignada al trabajador/empresa en el periodo, no una constante.
+
+## 9.5 Días trabajados / subsidiados / licencia (reemplaza `15 − faltas`)
+
+> ⚠️ El Excel usa `días = 15 − faltas`, que ignora subsidios (DM), licencias y vacaciones.
+
+Modelo correcto por trabajador y periodo, derivado de `attendance`:
+```
+días_calendario_periodo (15 en quincena)
+ = días_efectivos_laborados      (asistió y trabajó)
+ + días_subsidiados              (DM, maternidad — los paga EsSalud, no el empleador)
+ + días_licencia_con_goce        (pagados)
+ + días_licencia_sin_goce        (no pagados)
+ + días_vacaciones               (pagados, base distinta)
+ + días_falta_injustificada      (descuento)
+ + días_falta_justificada
+ + descansos/feriados            (no descuentan)
+```
+Cada categoría afecta de forma distinta la remuneración y las bases. El "día trabajado" para
+remuneración ≠ "15 − faltas". Definir el desglose con RRHH/contador.
 
 ---
 
