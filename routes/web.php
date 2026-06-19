@@ -3,7 +3,9 @@
 use App\Http\Controllers\Admin\ConceptoController;
 use App\Http\Controllers\Admin\EmpresaController;
 use App\Http\Controllers\Admin\ParametroPeriodoController;
+use App\Http\Controllers\Admin\SedeController;
 use App\Http\Controllers\Admin\TasaAfpController;
+use App\Http\Controllers\ContextoController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -26,6 +28,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    // Contexto: empresa/sede activa
+    Route::post('/contexto/empresa', [ContextoController::class, 'setEmpresa'])->name('contexto.empresa');
+    Route::post('/contexto/sede', [ContextoController::class, 'setSede'])->name('contexto.sede');
 });
 
 // Panel de administración (solo rol ADMIN)
@@ -34,6 +40,12 @@ Route::middleware(['auth', 'role:ADMIN'])->prefix('admin')->name('admin.')->grou
     Route::post('empresas', [EmpresaController::class, 'store'])->name('empresas.store');
     Route::put('empresas/{empresa}', [EmpresaController::class, 'update'])->name('empresas.update');
     Route::delete('empresas/{empresa}', [EmpresaController::class, 'destroy'])->name('empresas.destroy');
+
+    // Sedes (de la empresa activa)
+    Route::get('sedes', [SedeController::class, 'index'])->name('sedes.index');
+    Route::post('sedes', [SedeController::class, 'store'])->name('sedes.store');
+    Route::put('sedes/{sede}', [SedeController::class, 'update'])->name('sedes.update');
+    Route::delete('sedes/{sede}', [SedeController::class, 'destroy'])->name('sedes.destroy');
 
     // Maestros (configuración de reglas)
     Route::get('parametros', [ParametroPeriodoController::class, 'index'])->name('parametros.index');

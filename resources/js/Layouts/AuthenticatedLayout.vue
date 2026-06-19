@@ -5,13 +5,23 @@ import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 import NavLink from '@/Components/NavLink.vue';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
-import { Link, usePage } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 const showingNavigationDropdown = ref(false);
 
-const roles = computed(() => usePage().props.auth?.roles ?? []);
+const page = usePage();
+const roles = computed(() => page.props.auth?.roles ?? []);
 const esAdmin = computed(() => roles.value.includes('ADMIN'));
+
+const contexto = computed(() => page.props.contexto ?? { empresas: [], sedes: [], empresa_id: null, sede_id: null });
+
+function cambiarEmpresa(e) {
+    router.post(route('contexto.empresa'), { empresa_id: e.target.value }, { preserveScroll: true });
+}
+function cambiarSede(e) {
+    router.post(route('contexto.sede'), { sede_id: e.target.value || null }, { preserveScroll: true });
+}
 </script>
 
 <template>
@@ -52,6 +62,13 @@ const esAdmin = computed(() => roles.value.includes('ADMIN'));
                                 </NavLink>
                                 <NavLink
                                     v-if="esAdmin"
+                                    :href="route('admin.sedes.index')"
+                                    :active="route().current('admin.sedes.*')"
+                                >
+                                    Sedes
+                                </NavLink>
+                                <NavLink
+                                    v-if="esAdmin"
                                     :href="route('admin.parametros.index')"
                                     :active="route().current('admin.parametros.*')"
                                 >
@@ -75,6 +92,32 @@ const esAdmin = computed(() => roles.value.includes('ADMIN'));
                         </div>
 
                         <div class="hidden sm:ms-6 sm:flex sm:items-center">
+                            <!-- Selector de empresa / sede activa -->
+                            <div class="flex items-center gap-2 border-r border-gray-200 pr-4">
+                                <select
+                                    :value="contexto.empresa_id"
+                                    @change="cambiarEmpresa"
+                                    class="rounded-md border-gray-300 py-1 text-sm"
+                                    title="Empresa activa"
+                                >
+                                    <option v-for="e in contexto.empresas" :key="e.id" :value="e.id">
+                                        {{ e.nombre_comercial || e.razon_social }}
+                                    </option>
+                                </select>
+                                <select
+                                    v-if="contexto.sedes.length"
+                                    :value="contexto.sede_id ?? ''"
+                                    @change="cambiarSede"
+                                    class="rounded-md border-gray-300 py-1 text-sm"
+                                    title="Sede activa"
+                                >
+                                    <option value="">Todas las sedes</option>
+                                    <option v-for="s in contexto.sedes" :key="s.id" :value="s.id">
+                                        {{ s.nombre }}
+                                    </option>
+                                </select>
+                            </div>
+
                             <!-- Settings Dropdown -->
                             <div class="relative ms-3">
                                 <Dropdown align="right" width="48">
