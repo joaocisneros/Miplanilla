@@ -5,9 +5,13 @@ import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 import NavLink from '@/Components/NavLink.vue';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
 
 const showingNavigationDropdown = ref(false);
+
+const roles = computed(() => usePage().props.auth?.roles ?? []);
+const esAdmin = computed(() => roles.value.includes('ADMIN'));
 </script>
 
 <template>
@@ -38,6 +42,13 @@ const showingNavigationDropdown = ref(false);
                                     :active="route().current('dashboard')"
                                 >
                                     Dashboard
+                                </NavLink>
+                                <NavLink
+                                    v-if="esAdmin"
+                                    :href="route('admin.empresas.index')"
+                                    :active="route().current('admin.empresas.*')"
+                                >
+                                    Empresas
                                 </NavLink>
                             </div>
                         </div>
