@@ -22,6 +22,21 @@
 
 ---
 
+## 1.1 Multi-empresa (requisito del cliente)
+
+El sistema debe operar para **varias empresas** (multi-tenant), con datos **aislados** entre
+ellas. Distinción clave:
+
+- **Datos globales (ley peruana, comunes a todas las empresas):** tasas AFP/ONP, RMV, UIT,
+  tramos de renta de 5ta. Se configuran una sola vez.
+- **Datos por empresa (aislados):** pólizas SCTR/Vida Ley, áreas, cargos, turnos, conceptos,
+  empleados, contratos, periodos, planillas, boletas. Llevan `empresa_id`.
+- **Usuarios:** pueden estar asociados a una o varias empresas; un mismo RRHH podría operar
+  más de una. La empresa A nunca ve datos de la empresa B (scoping global por `empresa_id`).
+
+> Implementado en Fase 0: tabla `empresas`; `empresa_id` en `areas` y `employees`. Pendiente:
+> agregar `empresa_id` a `periodos`/`planillas` y aplicar un *global scope* de empresa activa.
+
 ## 2. Roles y permisos
 
 | Rol | Capacidades |
