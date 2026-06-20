@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\ParametroPeriodoController;
 use App\Http\Controllers\Admin\SedeController;
 use App\Http\Controllers\Admin\TasaAfpController;
 use App\Http\Controllers\Admin\TurnoController;
+use App\Http\Controllers\AsistenciaController;
 use App\Http\Controllers\ContextoController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\ProfileController;
@@ -46,6 +47,11 @@ Route::middleware('auth')->group(function () {
         Route::put('empleados/{empleado}', [EmployeeController::class, 'update'])->name('empleados.update');
         Route::delete('empleados/{empleado}', [EmployeeController::class, 'destroy'])->name('empleados.destroy');
     });
+
+    // Asistencia (importación Excel = vía principal)
+    Route::get('asistencia', [AsistenciaController::class, 'index'])->middleware('permission:asistencia.ver')->name('asistencia.index');
+    Route::get('asistencia/plantilla', [AsistenciaController::class, 'plantilla'])->middleware('permission:asistencia.ver')->name('asistencia.plantilla');
+    Route::post('asistencia/import', [AsistenciaController::class, 'import'])->middleware('permission:asistencia.sincronizar')->name('asistencia.import');
 });
 
 // Panel de administración (solo rol ADMIN)
