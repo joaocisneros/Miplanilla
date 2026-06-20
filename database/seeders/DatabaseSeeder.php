@@ -14,6 +14,7 @@ class DatabaseSeeder extends Seeder
             MaestrosSeeder::class,
             ConceptosSeeder::class,
             EmpresasSeeder::class,
+            EmpleadosRealesSeeder::class,
         ]);
 
         // Usuario ADMIN inicial (cambiar contraseña tras el primer ingreso)
