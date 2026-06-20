@@ -17,6 +17,8 @@ const esAdmin = computed(() => roles.value.includes('ADMIN'));
 const permisos = computed(() => page.props.auth?.permissions ?? []);
 const puedeVerEmpleados = computed(() => permisos.value.includes('empleados.ver'));
 const puedeVerAsistencia = computed(() => permisos.value.includes('asistencia.ver'));
+const puedeVerPlanilla = computed(() => permisos.value.includes('planilla.ver'));
+const puedeVerReportes = computed(() => permisos.value.includes('reportes.ver'));
 
 const contexto = computed(() => page.props.contexto ?? { empresas: [], sedes: [], empresa_id: null, sede_id: null });
 
@@ -70,6 +72,20 @@ function cambiarSede(e) {
                                     :active="route().current('asistencia.*')"
                                 >
                                     Asistencia
+                                </NavLink>
+                                <NavLink
+                                    v-if="puedeVerPlanilla"
+                                    :href="route('planilla.index')"
+                                    :active="route().current('planilla.*')"
+                                >
+                                    Planilla
+                                </NavLink>
+                                <NavLink
+                                    v-if="puedeVerReportes"
+                                    :href="route('reportes.consolidado')"
+                                    :active="route().current('reportes.*')"
+                                >
+                                    Consolidado
                                 </NavLink>
                                 <NavLink
                                     v-if="esAdmin"

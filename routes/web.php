@@ -9,9 +9,12 @@ use App\Http\Controllers\Admin\SedeController;
 use App\Http\Controllers\Admin\TasaAfpController;
 use App\Http\Controllers\Admin\TurnoController;
 use App\Http\Controllers\AsistenciaController;
+use App\Http\Controllers\BoletaController;
 use App\Http\Controllers\ContextoController;
 use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\PlanillaController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ReporteController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -52,6 +55,21 @@ Route::middleware('auth')->group(function () {
     Route::get('asistencia', [AsistenciaController::class, 'index'])->middleware('permission:asistencia.ver')->name('asistencia.index');
     Route::get('asistencia/plantilla', [AsistenciaController::class, 'plantilla'])->middleware('permission:asistencia.ver')->name('asistencia.plantilla');
     Route::post('asistencia/import', [AsistenciaController::class, 'import'])->middleware('permission:asistencia.sincronizar')->name('asistencia.import');
+
+    // Planilla
+    Route::get('planilla', [PlanillaController::class, 'index'])->middleware('permission:planilla.ver')->name('planilla.index');
+    Route::get('planilla/{payroll}', [PlanillaController::class, 'show'])->middleware('permission:planilla.ver')->name('planilla.show');
+    Route::middleware('permission:planilla.generar')->group(function () {
+        Route::post('planilla/periodos', [PlanillaController::class, 'storePeriodo'])->name('planilla.periodos.store');
+        Route::post('planilla/periodos/{periodo}/generar', [PlanillaController::class, 'generar'])->name('planilla.generar');
+    });
+    Route::post('planilla/{payroll}/cerrar', [PlanillaController::class, 'cerrar'])->middleware('permission:planilla.cerrar')->name('planilla.cerrar');
+
+    // Boletas PDF
+    Route::get('boletas/{detalle}/pdf', [BoletaController::class, 'pdf'])->middleware('permission:boletas.ver')->name('boletas.pdf');
+
+    // Reportes
+    Route::get('reportes/consolidado', [ReporteController::class, 'consolidado'])->middleware('permission:reportes.ver')->name('reportes.consolidado');
 });
 
 // Panel de administración (solo rol ADMIN)
