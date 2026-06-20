@@ -12,6 +12,8 @@ const props = defineProps({
     modo: { type: String, default: 'create' }, // create | edit
 });
 
+const emit = defineEmits(['guardado', 'cancelar']);
+
 const e = props.empleado ?? {};
 const c = props.contrato ?? {};
 
@@ -63,10 +65,11 @@ function quitarDH(i) {
 }
 
 function enviar() {
+    const opts = { onSuccess: () => emit('guardado') };
     if (props.modo === 'edit') {
-        form.put(route('empleados.update', props.empleado.id));
+        form.put(route('empleados.update', props.empleado.id), opts);
     } else {
-        form.post(route('empleados.store'));
+        form.post(route('empleados.store'), opts);
     }
 }
 const inp = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm';
@@ -149,7 +152,10 @@ const inp = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm';
             </div>
         </section>
 
-        <div class="flex items-center gap-3">
+        <div class="flex items-center justify-end gap-3">
+            <button type="button" @click="emit('cancelar')" class="rounded-md bg-gray-200 px-5 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-300">
+                Cancelar
+            </button>
             <button type="submit" :disabled="form.processing" class="rounded-md bg-indigo-600 px-6 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50">
                 {{ modo === 'edit' ? 'Actualizar empleado' : 'Registrar empleado' }}
             </button>

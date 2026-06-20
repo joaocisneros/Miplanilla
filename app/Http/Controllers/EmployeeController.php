@@ -20,24 +20,36 @@ class EmployeeController extends Controller
         $empresaId = $request->session()->get('empresa_id');
         $sedeId = $request->session()->get('sede_id');
 
-        $empleados = Employee::with(['sede:id,nombre', 'contratoVigente'])
+        $empleados = Employee::with(['sede:id,nombre', 'contratoVigente', 'derechohabientes'])
             ->where('empresa_id', $empresaId)
             ->when($sedeId, fn ($q) => $q->where('sede_id', $sedeId))
             ->orderBy('apellido_paterno')
             ->get()
-            ->map(fn ($e) => [
-                'id' => $e->id,
-                'nombre_completo' => $e->nombre_completo,
-                'numero_documento' => $e->numero_documento,
-                'sede' => $e->sede?->nombre,
-                'sueldo_basico' => $e->contratoVigente->first()?->sueldo_basico,
-                'sistema_pensiones' => $e->contratoVigente->first()?->sistema_pensiones,
-                'activo' => $e->activo,
-            ]);
+            ->map(function ($e) {
+                $c = $e->contratoVigente->first();
+                return [
+                    'id' => $e->id,
+                    'nombre_completo' => $e->nombre_completo,
+                    'numero_documento' => $e->numero_documento,
+                    'sede' => $e->sede?->nombre,
+                    'sueldo_basico' => $c?->sueldo_basico,
+                    'sistema_pensiones' => $c?->sistema_pensiones,
+                    'activo' => $e->activo,
+                    // Datos para el modal de edición
+                    'empleado' => $e->only([
+                        'id', 'apellido_paterno', 'apellido_materno', 'nombres', 'tipo_documento',
+                        'numero_documento', 'fecha_nacimiento', 'genero', 'estado_civil', 'telefono',
+                        'correo', 'sede_id', 'banco', 'cuenta_ahorros', 'cci', 'codigo_biometrico',
+                    ]),
+                    'contrato' => $c,
+                    'derechohabientes' => $e->derechohabientes,
+                ];
+            });
 
-        return Inertia::render('Empleados/Index', [
-            'empleados' => $empleados,
-        ]);
+        return Inertia::render('Empleados/Index', array_merge(
+            ['empleados' => $empleados],
+            $this->datosFormulario($request)
+        ));
     }
 
     public function create(Request $request): Response
