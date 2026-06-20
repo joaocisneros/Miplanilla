@@ -1,10 +1,13 @@
 <?php
 
+use App\Http\Controllers\Admin\AreaController;
+use App\Http\Controllers\Admin\CargoController;
 use App\Http\Controllers\Admin\ConceptoController;
 use App\Http\Controllers\Admin\EmpresaController;
 use App\Http\Controllers\Admin\ParametroPeriodoController;
 use App\Http\Controllers\Admin\SedeController;
 use App\Http\Controllers\Admin\TasaAfpController;
+use App\Http\Controllers\Admin\TurnoController;
 use App\Http\Controllers\ContextoController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\ProfileController;
@@ -70,6 +73,22 @@ Route::middleware(['auth', 'role:ADMIN'])->prefix('admin')->name('admin.')->grou
 
     Route::get('conceptos', [ConceptoController::class, 'index'])->name('conceptos.index');
     Route::put('conceptos/{concepto}', [ConceptoController::class, 'update'])->name('conceptos.update');
+
+    // Catálogos por empresa/globales
+    Route::get('areas', [AreaController::class, 'index'])->name('areas.index');
+    Route::post('areas', [AreaController::class, 'store'])->name('areas.store');
+    Route::put('areas/{area}', [AreaController::class, 'update'])->name('areas.update');
+    Route::delete('areas/{area}', [AreaController::class, 'destroy'])->name('areas.destroy');
+
+    Route::get('cargos', [CargoController::class, 'index'])->name('cargos.index');
+    Route::post('cargos', [CargoController::class, 'store'])->name('cargos.store');
+    Route::put('cargos/{cargo}', [CargoController::class, 'update'])->name('cargos.update');
+    Route::delete('cargos/{cargo}', [CargoController::class, 'destroy'])->name('cargos.destroy');
+
+    Route::get('turnos', [TurnoController::class, 'index'])->name('turnos.index');
+    Route::post('turnos', [TurnoController::class, 'store'])->name('turnos.store');
+    Route::put('turnos/{turno}', [TurnoController::class, 'update'])->name('turnos.update');
+    Route::delete('turnos/{turno}', [TurnoController::class, 'destroy'])->name('turnos.destroy');
 });
 
 require __DIR__.'/auth.php';

@@ -98,6 +98,9 @@ function cambiarSede(e) {
                                 >
                                     Conceptos
                                 </NavLink>
+                                <NavLink v-if="esAdmin" :href="route('admin.areas.index')" :active="route().current('admin.areas.*')">Áreas</NavLink>
+                                <NavLink v-if="esAdmin" :href="route('admin.cargos.index')" :active="route().current('admin.cargos.*')">Cargos</NavLink>
+                                <NavLink v-if="esAdmin" :href="route('admin.turnos.index')" :active="route().current('admin.turnos.*')">Turnos</NavLink>
                             </div>
                         </div>
 
