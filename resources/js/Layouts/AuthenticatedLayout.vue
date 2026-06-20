@@ -1,24 +1,17 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import ApplicationLogo from '@/Components/ApplicationLogo.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
-import NavLink from '@/Components/NavLink.vue';
-import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
-import { computed } from 'vue';
-
-const showingNavigationDropdown = ref(false);
 
 const page = usePage();
+const sidebarAbierto = ref(true);
+
 const roles = computed(() => page.props.auth?.roles ?? []);
 const esAdmin = computed(() => roles.value.includes('ADMIN'));
-
 const permisos = computed(() => page.props.auth?.permissions ?? []);
-const puedeVerEmpleados = computed(() => permisos.value.includes('empleados.ver'));
-const puedeVerAsistencia = computed(() => permisos.value.includes('asistencia.ver'));
-const puedeVerPlanilla = computed(() => permisos.value.includes('planilla.ver'));
-const puedeVerReportes = computed(() => permisos.value.includes('reportes.ver'));
+const can = (p) => permisos.value.includes(p);
 
 const contexto = computed(() => page.props.contexto ?? { empresas: [], sedes: [], empresa_id: null, sede_id: null });
 
@@ -28,281 +21,113 @@ function cambiarEmpresa(e) {
 function cambiarSede(e) {
     router.post(route('contexto.sede'), { sede_id: e.target.value || null }, { preserveScroll: true });
 }
+
+// Definición del menú agrupado
+const menu = computed(() => [
+    {
+        titulo: 'Operación',
+        items: [
+            { label: 'Dashboard', icon: '🏠', route: 'dashboard', active: 'dashboard', show: true },
+            { label: 'Empleados', icon: '👥', route: 'empleados.index', active: 'empleados.*', show: can('empleados.ver') },
+            { label: 'Asistencia', icon: '🕒', route: 'asistencia.index', active: 'asistencia.*', show: can('asistencia.ver') },
+            { label: 'Planilla', icon: '💰', route: 'planilla.index', active: 'planilla.*', show: can('planilla.ver') },
+            { label: 'Consolidado', icon: '📊', route: 'reportes.consolidado', active: 'reportes.*', show: can('reportes.ver') },
+        ],
+    },
+    {
+        titulo: 'Configuración',
+        items: [
+            { label: 'Empresas', icon: '🏢', route: 'admin.empresas.index', active: 'admin.empresas.*', show: esAdmin.value },
+            { label: 'Sedes', icon: '📍', route: 'admin.sedes.index', active: 'admin.sedes.*', show: esAdmin.value },
+            { label: 'Áreas', icon: '🗂️', route: 'admin.areas.index', active: 'admin.areas.*', show: esAdmin.value },
+            { label: 'Cargos', icon: '🏷️', route: 'admin.cargos.index', active: 'admin.cargos.*', show: esAdmin.value },
+            { label: 'Turnos', icon: '⏰', route: 'admin.turnos.index', active: 'admin.turnos.*', show: esAdmin.value },
+            { label: 'Parámetros', icon: '⚙️', route: 'admin.parametros.index', active: 'admin.parametros.*', show: esAdmin.value },
+            { label: 'Tasas AFP', icon: '📈', route: 'admin.tasas-afp.index', active: 'admin.tasas-afp.*', show: esAdmin.value },
+            { label: 'Conceptos', icon: '🧮', route: 'admin.conceptos.index', active: 'admin.conceptos.*', show: esAdmin.value },
+        ],
+    },
+]);
 </script>
 
 <template>
-    <div>
-        <div class="min-h-screen bg-gray-100">
-            <nav
-                class="border-b border-gray-100 bg-white"
-            >
-                <!-- Primary Navigation Menu -->
-                <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                    <div class="flex h-16 justify-between">
-                        <div class="flex">
-                            <!-- Logo -->
-                            <div class="flex shrink-0 items-center">
-                                <Link :href="route('dashboard')">
-                                    <ApplicationLogo
-                                        class="block h-9 w-auto fill-current text-gray-800"
-                                    />
-                                </Link>
-                            </div>
+    <div class="min-h-screen bg-gray-100">
+        <!-- Sidebar -->
+        <aside
+            :class="sidebarAbierto ? 'w-64' : 'w-0 -translate-x-full'"
+            class="fixed inset-y-0 left-0 z-30 flex flex-col overflow-hidden bg-gray-900 text-gray-200 transition-all duration-200"
+        >
+            <div class="flex h-16 items-center gap-2 border-b border-gray-800 px-4">
+                <ApplicationLogo class="h-8 w-auto fill-current text-white" />
+                <span class="text-lg font-semibold text-white">MiPlanilla</span>
+            </div>
 
-                            <!-- Navigation Links -->
-                            <div
-                                class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex"
+            <nav class="flex-1 overflow-y-auto px-3 py-4">
+                <template v-for="grupo in menu" :key="grupo.titulo">
+                    <div v-if="grupo.items.some((i) => i.show)" class="mb-6">
+                        <p class="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-gray-500">{{ grupo.titulo }}</p>
+                        <template v-for="item in grupo.items" :key="item.label">
+                            <Link
+                                v-if="item.show"
+                                :href="route(item.route)"
+                                :class="route().current(item.active)
+                                    ? 'bg-indigo-600 text-white'
+                                    : 'text-gray-300 hover:bg-gray-800 hover:text-white'"
+                                class="mb-1 flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition"
                             >
-                                <NavLink
-                                    :href="route('dashboard')"
-                                    :active="route().current('dashboard')"
-                                >
-                                    Dashboard
-                                </NavLink>
-                                <NavLink
-                                    v-if="puedeVerEmpleados"
-                                    :href="route('empleados.index')"
-                                    :active="route().current('empleados.*')"
-                                >
-                                    Empleados
-                                </NavLink>
-                                <NavLink
-                                    v-if="puedeVerAsistencia"
-                                    :href="route('asistencia.index')"
-                                    :active="route().current('asistencia.*')"
-                                >
-                                    Asistencia
-                                </NavLink>
-                                <NavLink
-                                    v-if="puedeVerPlanilla"
-                                    :href="route('planilla.index')"
-                                    :active="route().current('planilla.*')"
-                                >
-                                    Planilla
-                                </NavLink>
-                                <NavLink
-                                    v-if="puedeVerReportes"
-                                    :href="route('reportes.consolidado')"
-                                    :active="route().current('reportes.*')"
-                                >
-                                    Consolidado
-                                </NavLink>
-                                <NavLink
-                                    v-if="esAdmin"
-                                    :href="route('admin.empresas.index')"
-                                    :active="route().current('admin.empresas.*')"
-                                >
-                                    Empresas
-                                </NavLink>
-                                <NavLink
-                                    v-if="esAdmin"
-                                    :href="route('admin.sedes.index')"
-                                    :active="route().current('admin.sedes.*')"
-                                >
-                                    Sedes
-                                </NavLink>
-                                <NavLink
-                                    v-if="esAdmin"
-                                    :href="route('admin.parametros.index')"
-                                    :active="route().current('admin.parametros.*')"
-                                >
-                                    Parámetros
-                                </NavLink>
-                                <NavLink
-                                    v-if="esAdmin"
-                                    :href="route('admin.tasas-afp.index')"
-                                    :active="route().current('admin.tasas-afp.*')"
-                                >
-                                    Tasas AFP
-                                </NavLink>
-                                <NavLink
-                                    v-if="esAdmin"
-                                    :href="route('admin.conceptos.index')"
-                                    :active="route().current('admin.conceptos.*')"
-                                >
-                                    Conceptos
-                                </NavLink>
-                                <NavLink v-if="esAdmin" :href="route('admin.areas.index')" :active="route().current('admin.areas.*')">Áreas</NavLink>
-                                <NavLink v-if="esAdmin" :href="route('admin.cargos.index')" :active="route().current('admin.cargos.*')">Cargos</NavLink>
-                                <NavLink v-if="esAdmin" :href="route('admin.turnos.index')" :active="route().current('admin.turnos.*')">Turnos</NavLink>
-                            </div>
-                        </div>
-
-                        <div class="hidden sm:ms-6 sm:flex sm:items-center">
-                            <!-- Selector de empresa / sede activa -->
-                            <div class="flex items-center gap-2 border-r border-gray-200 pr-4">
-                                <select
-                                    :value="contexto.empresa_id"
-                                    @change="cambiarEmpresa"
-                                    class="rounded-md border-gray-300 py-1 text-sm"
-                                    title="Empresa activa"
-                                >
-                                    <option v-for="e in contexto.empresas" :key="e.id" :value="e.id">
-                                        {{ e.nombre_comercial || e.razon_social }}
-                                    </option>
-                                </select>
-                                <select
-                                    v-if="contexto.sedes.length"
-                                    :value="contexto.sede_id ?? ''"
-                                    @change="cambiarSede"
-                                    class="rounded-md border-gray-300 py-1 text-sm"
-                                    title="Sede activa"
-                                >
-                                    <option value="">Todas las sedes</option>
-                                    <option v-for="s in contexto.sedes" :key="s.id" :value="s.id">
-                                        {{ s.nombre }}
-                                    </option>
-                                </select>
-                            </div>
-
-                            <!-- Settings Dropdown -->
-                            <div class="relative ms-3">
-                                <Dropdown align="right" width="48">
-                                    <template #trigger>
-                                        <span class="inline-flex rounded-md">
-                                            <button
-                                                type="button"
-                                                class="inline-flex items-center rounded-md border border-transparent bg-white px-3 py-2 text-sm font-medium leading-4 text-gray-500 transition duration-150 ease-in-out hover:text-gray-700 focus:outline-none"
-                                            >
-                                                {{ $page.props.auth.user.name }}
-
-                                                <svg
-                                                    class="-me-0.5 ms-2 h-4 w-4"
-                                                    xmlns="http://www.w3.org/2000/svg"
-                                                    viewBox="0 0 20 20"
-                                                    fill="currentColor"
-                                                >
-                                                    <path
-                                                        fill-rule="evenodd"
-                                                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                                                        clip-rule="evenodd"
-                                                    />
-                                                </svg>
-                                            </button>
-                                        </span>
-                                    </template>
-
-                                    <template #content>
-                                        <DropdownLink
-                                            :href="route('profile.edit')"
-                                        >
-                                            Profile
-                                        </DropdownLink>
-                                        <DropdownLink
-                                            :href="route('logout')"
-                                            method="post"
-                                            as="button"
-                                        >
-                                            Log Out
-                                        </DropdownLink>
-                                    </template>
-                                </Dropdown>
-                            </div>
-                        </div>
-
-                        <!-- Hamburger -->
-                        <div class="-me-2 flex items-center sm:hidden">
-                            <button
-                                @click="
-                                    showingNavigationDropdown =
-                                        !showingNavigationDropdown
-                                "
-                                class="inline-flex items-center justify-center rounded-md p-2 text-gray-400 transition duration-150 ease-in-out hover:bg-gray-100 hover:text-gray-500 focus:bg-gray-100 focus:text-gray-500 focus:outline-none"
-                            >
-                                <svg
-                                    class="h-6 w-6"
-                                    stroke="currentColor"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        :class="{
-                                            hidden: showingNavigationDropdown,
-                                            'inline-flex':
-                                                !showingNavigationDropdown,
-                                        }"
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        stroke-width="2"
-                                        d="M4 6h16M4 12h16M4 18h16"
-                                    />
-                                    <path
-                                        :class="{
-                                            hidden: !showingNavigationDropdown,
-                                            'inline-flex':
-                                                showingNavigationDropdown,
-                                        }"
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        stroke-width="2"
-                                        d="M6 18L18 6M6 6l12 12"
-                                    />
-                                </svg>
-                            </button>
-                        </div>
+                                <span class="text-base">{{ item.icon }}</span>
+                                <span>{{ item.label }}</span>
+                            </Link>
+                        </template>
                     </div>
-                </div>
-
-                <!-- Responsive Navigation Menu -->
-                <div
-                    :class="{
-                        block: showingNavigationDropdown,
-                        hidden: !showingNavigationDropdown,
-                    }"
-                    class="sm:hidden"
-                >
-                    <div class="space-y-1 pb-3 pt-2">
-                        <ResponsiveNavLink
-                            :href="route('dashboard')"
-                            :active="route().current('dashboard')"
-                        >
-                            Dashboard
-                        </ResponsiveNavLink>
-                    </div>
-
-                    <!-- Responsive Settings Options -->
-                    <div
-                        class="border-t border-gray-200 pb-1 pt-4"
-                    >
-                        <div class="px-4">
-                            <div
-                                class="text-base font-medium text-gray-800"
-                            >
-                                {{ $page.props.auth.user.name }}
-                            </div>
-                            <div class="text-sm font-medium text-gray-500">
-                                {{ $page.props.auth.user.email }}
-                            </div>
-                        </div>
-
-                        <div class="mt-3 space-y-1">
-                            <ResponsiveNavLink :href="route('profile.edit')">
-                                Profile
-                            </ResponsiveNavLink>
-                            <ResponsiveNavLink
-                                :href="route('logout')"
-                                method="post"
-                                as="button"
-                            >
-                                Log Out
-                            </ResponsiveNavLink>
-                        </div>
-                    </div>
-                </div>
+                </template>
             </nav>
+        </aside>
 
-            <!-- Page Heading -->
-            <header
-                class="bg-white shadow"
-                v-if="$slots.header"
-            >
-                <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-                    <slot name="header" />
+        <!-- Contenido -->
+        <div :class="sidebarAbierto ? 'ml-64' : 'ml-0'" class="flex min-h-screen flex-col transition-all duration-200">
+            <!-- Topbar -->
+            <header class="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-gray-200 bg-white px-4 shadow-sm">
+                <div class="flex items-center gap-3">
+                    <button @click="sidebarAbierto = !sidebarAbierto" class="rounded-md p-2 text-gray-500 hover:bg-gray-100" title="Menú">
+                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                    </button>
+
+                    <!-- Selector empresa / sede -->
+                    <select :value="contexto.empresa_id" @change="cambiarEmpresa" class="rounded-md border-gray-300 py-1.5 text-sm" title="Empresa activa">
+                        <option v-for="e in contexto.empresas" :key="e.id" :value="e.id">{{ e.nombre_comercial || e.razon_social }}</option>
+                    </select>
+                    <select v-if="contexto.sedes.length" :value="contexto.sede_id ?? ''" @change="cambiarSede" class="rounded-md border-gray-300 py-1.5 text-sm" title="Sede activa">
+                        <option value="">Todas las sedes</option>
+                        <option v-for="s in contexto.sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+                    </select>
                 </div>
+
+                <Dropdown align="right" width="48">
+                    <template #trigger>
+                        <button class="inline-flex items-center rounded-md border border-transparent bg-white px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900">
+                            {{ page.props.auth.user.name }}
+                            <svg class="-me-0.5 ms-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                        </button>
+                    </template>
+                    <template #content>
+                        <DropdownLink :href="route('profile.edit')">Perfil</DropdownLink>
+                        <DropdownLink :href="route('logout')" method="post" as="button">Cerrar sesión</DropdownLink>
+                    </template>
+                </Dropdown>
             </header>
 
-            <!-- Page Content -->
-            <main>
+            <!-- Flash messages -->
+            <div v-if="$page.props.flash?.success" class="mx-6 mt-4 rounded-md bg-green-50 px-4 py-3 text-sm text-green-800">{{ $page.props.flash.success }}</div>
+            <div v-if="$page.props.flash?.error" class="mx-6 mt-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-800">{{ $page.props.flash.error }}</div>
+
+            <!-- Header de página -->
+            <div v-if="$slots.header" class="bg-white px-6 py-4 shadow-sm">
+                <slot name="header" />
+            </div>
+
+            <!-- Contenido principal -->
+            <main class="flex-1">
                 <slot />
             </main>
         </div>
