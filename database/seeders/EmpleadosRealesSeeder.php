@@ -33,7 +33,10 @@ class EmpleadosRealesSeeder extends Seeder
             $sede = Sede::where('empresa_id', $empresa->id)->first();
 
             foreach ($empleados as $i => $e) {
-                $doc = sprintf('TMP-%s-%02d', str($razonSocial)->slug(), $i + 1);
+                // Usa el DNI real si el Excel lo trae; si no, documento provisional corto.
+                $doc = ! empty($e['dni'])
+                    ? $e['dni']
+                    : sprintf('TMP%d-%03d', $empresa->id, $i + 1);
 
                 $empleado = Employee::updateOrCreate(
                     ['numero_documento' => $doc],
