@@ -135,7 +135,11 @@ Route::middleware(['auth', 'role:ADMIN'])->prefix('admin')->name('admin.')->grou
     Route::put('roles-permisos', [UsuarioController::class, 'actualizarPermisos'])->name('roles.permisos');
     Route::post('usuarios', [UsuarioController::class, 'store'])->name('usuarios.store');
     Route::put('usuarios/{usuario}', [UsuarioController::class, 'update'])->name('usuarios.update');
+    Route::patch('usuarios/{usuario}/estado', [UsuarioController::class, 'toggleActivo'])->name('usuarios.estado');
     Route::delete('usuarios/{usuario}', [UsuarioController::class, 'destroy'])->name('usuarios.destroy');
+
+    // Bitácora / Auditoría: historial de cambios (quién cambió qué)
+    Route::get('auditoria', [\App\Http\Controllers\Admin\AuditoriaController::class, 'index'])->name('auditoria.index');
 
     // Sedes (de la empresa activa)
     Route::get('sedes', [SedeController::class, 'index'])->name('sedes.index');

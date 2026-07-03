@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\RestringidoPorEmpresa;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use OwenIt\Auditing\Contracts\Auditable;
@@ -9,6 +10,7 @@ use OwenIt\Auditing\Contracts\Auditable;
 class Attendance extends Model implements Auditable
 {
     use \OwenIt\Auditing\Auditable;
+    use RestringidoPorEmpresa;
 
     protected $table = 'attendance';
 

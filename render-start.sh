@@ -18,5 +18,10 @@ php artisan config:cache || true
 echo "==> Migrando base de datos (conserva todo)..."
 php artisan migrate --force || true
 
+# Sincroniza roles y permisos (AUDITOR, RRHH, etc.). Es idempotente: NO borra
+# usuarios ni datos, solo crea/actualiza los roles y sus permisos.
+echo "==> Sincronizando roles y permisos..."
+php artisan db:seed --class=RolePermissionSeeder --force || true
+
 echo "==> Iniciando servidor en el puerto $PORT ..."
 php artisan serve --host=0.0.0.0 --port="$PORT"

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Area;
 use App\Models\Cargo;
 use App\Models\Employee;
+use App\Models\Empresa;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +24,7 @@ class UsuarioController extends Controller
     {
         $usuarios = User::with([
             'roles:id,name',
+            'empresas:id,razon_social,nombre_comercial',
             'empleado:id,user_id,empresa_id,apellido_paterno,nombres',
             'empleado.empresa:id,razon_social,nombre_comercial',
         ])->orderBy('id')->get()->map(function ($u) {
@@ -34,6 +36,9 @@ class UsuarioController extends Controller
                 'name' => $u->name,
                 'email' => $u->email,
                 'rol' => $u->roles->first()?->name,
+                'activo' => (bool) $u->activo,
+                'empresas_ids' => $u->empresas->pluck('id')->values(),
+                'empresas_nombres' => $u->empresas->map(fn ($e) => $e->nombre_comercial ?: $e->razon_social)->values(),
                 'es_super' => $u->esSuperAdmin(),
                 'ultimo_acceso' => $u->ultimo_acceso?->diffForHumans(),
                 'ultimo_acceso_fecha' => $u->ultimo_acceso?->format('d/m/Y H:i'),
@@ -74,6 +79,9 @@ class UsuarioController extends Controller
             'usuarios' => $usuarios,
             'roles' => Role::orderBy('name')->pluck('name'),
             'empleados' => $empleados,
+            'empresasDisponibles' => Empresa::where('activo', true)->orderBy('razon_social')
+                ->get(['id', 'razon_social', 'nombre_comercial'])
+                ->map(fn ($e) => ['id' => $e->id, 'nombre' => $e->nombre_comercial ?: $e->razon_social]),
             'rolesDetalle' => $rolesDetalle,
             'todosPermisos' => Permission::orderBy('name')->pluck('name'),
         ]);
@@ -87,6 +95,8 @@ class UsuarioController extends Controller
             'password' => ['required', Password::defaults()],
             'rol' => ['required', 'exists:roles,name'],
             'empleado_id' => ['nullable', 'exists:employees,id'],
+            'empresas' => ['array'],
+            'empresas.*' => ['integer', 'exists:empresas,id'],
         ]);
 
         DB::transaction(function () use ($data) {
@@ -96,6 +106,8 @@ class UsuarioController extends Controller
                 'password' => Hash::make($data['password']),
             ]);
             $user->syncRoles([$data['rol']]);
+            // Empresas con acceso (vacío = todas). Limita al contador/auditor a su(s) empresa(s).
+            $user->empresas()->sync($data['empresas'] ?? []);
 
             // Vínculo opcional con un empleado (para heredar su empresa/área/cargo).
             if (! empty($data['empleado_id'])) {
@@ -117,6 +129,8 @@ class UsuarioController extends Controller
             'password' => ['nullable', Password::defaults()],
             'rol' => ['required', 'exists:roles,name'],
             'empleado_id' => ['nullable', 'exists:employees,id'],
+            'empresas' => ['array'],
+            'empresas.*' => ['integer', 'exists:empresas,id'],
         ]);
 
         // Al super admin nunca se le quita el rol ADMIN.
@@ -129,6 +143,8 @@ class UsuarioController extends Controller
                 ...($data['password'] ? ['password' => Hash::make($data['password'])] : []),
             ]);
             $usuario->syncRoles([$rol]);
+            // El super admin nunca se restringe: siempre ve todas las empresas.
+            $usuario->empresas()->sync($usuario->esSuperAdmin() ? [] : ($data['empresas'] ?? []));
 
             // Re-vincular empleado: suelto el anterior y asigno el nuevo (no borra empleados).
             Employee::where('user_id', $usuario->id)->update(['user_id' => null]);
@@ -156,6 +172,19 @@ class UsuarioController extends Controller
         $role->syncPermissions($data['permisos'] ?? []);
 
         return back()->with('success', "Permisos de {$data['rol']} actualizados.");
+    }
+
+    /** Activa o desactiva un usuario (cuando se retira, se desactiva sin borrar su historial). */
+    public function toggleActivo(Request $request, User $usuario)
+    {
+        abort_if($usuario->esSuperAdmin(), 403, 'El super administrador no se puede desactivar.');
+        abort_if($usuario->id === $request->user()->id, 403, 'No puedes desactivar tu propio usuario.');
+
+        $usuario->update(['activo' => ! $usuario->activo]);
+
+        return back()->with('success', $usuario->activo
+            ? 'Usuario activado.'
+            : 'Usuario desactivado: ya no podrá iniciar sesión.');
     }
 
     public function destroy(Request $request, User $usuario)

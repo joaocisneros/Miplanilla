@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\RestringidoPorEmpresa;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Payroll extends Model
 {
+    use RestringidoPorEmpresa;
+
     protected $table = 'payrolls';
 
     protected $fillable = [

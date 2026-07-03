@@ -23,6 +23,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'activo',
         'ultimo_acceso',
         'ultimo_acceso_ip',
     ];
@@ -47,6 +48,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'ultimo_acceso' => 'datetime',
+            'activo' => 'boolean',
             'password' => 'hashed',
         ];
     }
@@ -55,6 +57,42 @@ class User extends Authenticatable
     public function empleado()
     {
         return $this->hasOne(\App\Models\Employee::class);
+    }
+
+    /** Empresas a las que este usuario tiene acceso (vacío = todas). */
+    public function empresas()
+    {
+        return $this->belongsToMany(\App\Models\Empresa::class, 'empresa_user');
+    }
+
+    /** @var array<int>|null|false Memo de IDs permitidos (false = aún no calculado). */
+    protected array|null|false $empresaIdsCache = false;
+
+    /**
+     * IDs de empresas a las que el usuario puede acceder.
+     * Devuelve null = SIN restricción (ve todas). Un array = solo esas empresas.
+     * El super admin siempre ve todas.
+     */
+    public function empresasPermitidasIds(): ?array
+    {
+        if ($this->esSuperAdmin()) {
+            return null;
+        }
+        if ($this->empresaIdsCache !== false) {
+            return $this->empresaIdsCache;
+        }
+
+        // Consulta directa al pivote (evita el global scope de Empresa y recursión).
+        $ids = \Illuminate\Support\Facades\DB::table('empresa_user')
+            ->where('user_id', $this->id)->pluck('empresa_id')->map(fn ($v) => (int) $v)->all();
+
+        return $this->empresaIdsCache = count($ids) ? $ids : null;
+    }
+
+    /** ¿El usuario está limitado a una o más empresas? */
+    public function estaRestringido(): bool
+    {
+        return $this->empresasPermitidasIds() !== null;
     }
 
     /** El super administrador (primer usuario) está protegido: no se puede borrar ni cambiar su rol. */

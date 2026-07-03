@@ -45,6 +45,11 @@ class RolePermissionSeeder extends Seeder
                 'asistencia.ver', 'asistencia.validar', 'asistencia.justificar',
                 'empleados.ver', 'reportes.ver',
             ],
+            // Contador / auditor externo: SOLO LECTURA de su(s) empresa(s).
+            'AUDITOR' => [
+                'empleados.ver', 'asistencia.ver', 'planilla.ver',
+                'boletas.ver', 'reportes.ver',
+            ],
             'EMPLEADO' => [
                 'asistencia.ver', 'boletas.ver',
             ],

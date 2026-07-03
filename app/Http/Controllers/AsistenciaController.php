@@ -426,6 +426,9 @@ class AsistenciaController extends Controller
      */
     public function plantillaMensual(Request $request)
     {
+        @set_time_limit(300);
+        @ini_set('memory_limit', '512M');
+
         $anio = (int) ($request->input('anio') ?: now()->year);
         $mes = (int) ($request->input('mes') ?: now()->month);
         $empresaId = $request->input('empresa_id') ?: null;
@@ -532,6 +535,10 @@ class AsistenciaController extends Controller
      */
     public function plantillaAnual(Request $request)
     {
+        // El Excel anual (todas las empresas × todo el año) es pesado: evita cortes por tiempo/memoria.
+        @set_time_limit(300);
+        @ini_set('memory_limit', '512M');
+
         $anio = (int) ($request->input('anio') ?: now()->year);
         $meses = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
         $diaSem = ['Sun' => 'Dom', 'Mon' => 'Lun', 'Tue' => 'Mar', 'Wed' => 'Mié', 'Thu' => 'Jue', 'Fri' => 'Vie', 'Sat' => 'Sáb'];
@@ -632,7 +639,11 @@ class AsistenciaController extends Controller
         $sh->freezePane('A5');
 
         $tmp = storage_path('app/'.uniqid('anual_').'.xlsx');
-        (new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($ss))->save($tmp);
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($ss);
+        $writer->setPreCalculateFormulas(false); // no recalcular fórmulas: mucho más rápido
+        $writer->save($tmp);
+        $ss->disconnectWorksheets();
+        unset($ss);
 
         return response()->download($tmp, 'ASISTENCIA_'.$anio.'.xlsx')->deleteFileAfterSend(true);
     }
@@ -682,15 +693,24 @@ class AsistenciaController extends Controller
             }
         }
         $oldFin = $sh->getHighestRow();
+        // Si generamos MENOS filas que las que ya trae la plantilla, NO usamos removeRow
+        // (borrar miles de filas una por una es lentísimo y llega a colgarse por minutos).
+        // En su lugar rellenamos con filas en blanco: limpia los datos viejos (sin fugas de
+        // otras empresas) en una sola escritura rápida.
+        $filaVacia = array_fill(0, 11, '');
+        while (count($data) + 4 < $oldFin) {
+            $data[] = $filaVacia;
+        }
         $sh->fromArray($data, null, 'A5');
         $newFin = count($data) + 4;
-        if ($oldFin > $newFin) {
-            $sh->removeRow($newFin + 1, $oldFin - $newFin);
-        }
         $sh->getStyle('B5:B'.$newFin)->getNumberFormat()->setFormatCode('@');
 
         $tmp = storage_path('app/'.uniqid('anual_').'.xlsm');
-        (new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($ss))->save($tmp);
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($ss);
+        $writer->setPreCalculateFormulas(false); // no recalcular fórmulas: mucho más rápido en archivos grandes
+        $writer->save($tmp);
+        $ss->disconnectWorksheets();
+        unset($ss);
 
         return response()->download($tmp, 'ASISTENCIA_'.$anio.'.xlsm')->deleteFileAfterSend(true);
     }

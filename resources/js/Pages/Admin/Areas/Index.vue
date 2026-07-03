@@ -1,6 +1,7 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import CrudModal from '@/Components/CrudModal.vue';
+import BotonAccion from '@/Components/BotonAccion.vue';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { ref } from 'vue';
 
@@ -60,7 +61,7 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                             <td class="px-4 py-3 font-medium text-gray-900">{{ a.nombre }}</td>
                             <td class="px-4 py-3">{{ a.es_riesgo ? 'Sí' : 'No' }}</td>
                             <td class="px-4 py-3"><span :class="a.activo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'" class="rounded-full px-2 py-1 text-xs">{{ a.activo ? 'Activa' : 'Inactiva' }}</span></td>
-                            <td class="px-4 py-3 text-right"><button @click="abrirEditar(a)" class="text-indigo-600 hover:text-indigo-900">Editar</button><button @click="eliminar(a)" class="ml-3 text-red-600 hover:text-red-900">Eliminar</button></td>
+                            <td class="px-4 py-3 text-right"><div class="inline-flex gap-2"><BotonAccion variante="editar" @click="abrirEditar(a)" /><BotonAccion variante="eliminar" @click="eliminar(a)" /></div></td>
                         </tr>
                         <tr v-if="areas.length === 0"><td colspan="5" class="px-4 py-6 text-center text-gray-500">No hay áreas con ese filtro.</td></tr>
                     </tbody>

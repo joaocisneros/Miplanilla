@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\RestringidoPorEmpresa;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -11,6 +12,7 @@ use OwenIt\Auditing\Contracts\Auditable;
 class Employee extends Model implements Auditable
 {
     use SoftDeletes, \OwenIt\Auditing\Auditable;
+    use RestringidoPorEmpresa;
 
     protected $table = 'employees';
 

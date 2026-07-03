@@ -1,6 +1,7 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import CrudModal from '@/Components/CrudModal.vue';
+import BotonAccion from '@/Components/BotonAccion.vue';
 import { Head, useForm } from '@inertiajs/vue3';
 import { ref } from 'vue';
 
@@ -47,7 +48,7 @@ const inp = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm';
                             <td class="px-4 py-3">{{ p.dias_base }}</td>
                             <td class="px-4 py-3">{{ p.vigente_desde?.substring(0,10) }}</td>
                             <td class="px-4 py-3"><span :class="p.confirmado ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'" class="rounded-full px-2 py-1 text-xs">{{ p.confirmado ? 'Confirmado' : 'Por confirmar' }}</span></td>
-                            <td class="px-4 py-3 text-right"><button @click="abrirEditar(p)" class="text-indigo-600 hover:text-indigo-900">Editar</button></td>
+                            <td class="px-4 py-3 text-right"><BotonAccion variante="editar" @click="abrirEditar(p)" /></td>
                         </tr>
                         <tr v-if="parametros.length === 0"><td colspan="8" class="px-4 py-6 text-center text-gray-500">Sin parámetros todavía.</td></tr>
                     </tbody>

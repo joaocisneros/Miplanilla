@@ -1,6 +1,7 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import CrudModal from '@/Components/CrudModal.vue';
+import BotonAccion from '@/Components/BotonAccion.vue';
 import { Head, useForm } from '@inertiajs/vue3';
 import { ref } from 'vue';
 
@@ -50,7 +51,7 @@ const inp = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm';
                             <td class="px-4 py-3">{{ t.refrigerio_min }} min</td>
                             <td class="px-4 py-3">{{ t.tolerancia_min }} min</td>
                             <td class="px-4 py-3">{{ t.cruza_medianoche ? 'Sí' : 'No' }}</td>
-                            <td class="px-4 py-3 text-right"><button @click="abrirEditar(t)" class="text-indigo-600 hover:text-indigo-900">Editar</button><button @click="eliminar(t)" class="ml-3 text-red-600 hover:text-red-900">Eliminar</button></td>
+                            <td class="px-4 py-3 text-right"><div class="inline-flex gap-2"><BotonAccion variante="editar" @click="abrirEditar(t)" /><BotonAccion variante="eliminar" @click="eliminar(t)" /></div></td>
                         </tr>
                         <tr v-if="turnos.length === 0"><td colspan="8" class="px-4 py-6 text-center text-gray-500">Sin turnos todavía.</td></tr>
                     </tbody>

@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\RestringidoPorEmpresa;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AsistenciaResumen extends Model
 {
+    use RestringidoPorEmpresa;
+
     protected $table = 'asistencia_resumenes';
 
     protected $fillable = [

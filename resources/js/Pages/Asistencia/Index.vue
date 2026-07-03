@@ -25,13 +25,38 @@ const descarga = ref({ empresa_id: '', anio: hoy.getFullYear(), mes: hoy.getMont
 const mensualForm = useForm({ archivo: null });
 const anios = Array.from({ length: 6 }, (_, i) => 2026 + i); // 2026 en adelante
 
+// Descarga con indicador de progreso (el Excel anual puede tardar ~20-30s).
+const descargando = ref(false);
+async function descargarArchivo(url, nombreFallback) {
+    if (descargando.value) return;
+    descargando.value = true;
+    try {
+        const resp = await fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/octet-stream' } });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const blob = await resp.blob();
+        const cd = resp.headers.get('Content-Disposition');
+        const m = cd && cd.match(/filename="?([^"]+)"?/);
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = m ? m[1] : nombreFallback;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(a.href);
+    } catch (e) {
+        alert('No se pudo descargar el archivo: ' + e.message);
+    } finally {
+        descargando.value = false;
+    }
+}
+
 function descargarPlantillaMensual() {
     const q = { anio: descarga.value.anio, mes: descarga.value.mes };
     if (descarga.value.empresa_id) q.empresa_id = descarga.value.empresa_id;
-    window.location.href = route('asistencia.plantilla-mensual', q);
+    descargarArchivo(route('asistencia.plantilla-mensual', q), `ASISTENCIA_${descarga.value.anio}_${descarga.value.mes}.xlsx`);
 }
 function descargarPlantillaAnual() {
-    window.location.href = route('asistencia.plantilla-anual', { anio: descarga.value.anio });
+    descargarArchivo(route('asistencia.plantilla-anual', { anio: descarga.value.anio }), `ASISTENCIA_${descarga.value.anio}.xlsx`);
 }
 function importarMensual() {
     mensualForm.post(route('asistencia.import-mensual'), {
@@ -118,10 +143,12 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                                 <label class="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Año</label>
                                 <select v-model="descarga.anio" class="w-28 rounded-md border-slate-300 py-1.5 text-sm"><option v-for="a in anios" :key="a" :value="a">{{ a }}</option></select>
                             </div>
-                            <button type="button" @click="descargarPlantillaAnual" class="inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700">
-                                <span>📥</span> Descargar Excel del año
+                            <button type="button" @click="descargarPlantillaAnual" :disabled="descargando" class="inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60">
+                                <span v-if="descargando" class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                                <span v-else>📥</span>
+                                {{ descargando ? 'Generando… (puede tardar ~20s)' : 'Descargar Excel del año' }}
                             </button>
-                            <p class="mt-3 text-xs leading-relaxed text-slate-500">Trae las <b>3 empresas</b> y <b>todo el año</b>. Para ver un solo mes, usa el filtro <b>▼ de la columna MES</b> dentro del Excel.</p>
+                            <p class="mt-3 text-xs leading-relaxed text-slate-500">Trae las <b>3 empresas</b> y <b>todo el año</b>. Es un archivo grande: la descarga puede tardar <b>unos segundos</b>. Para ver un solo mes, usa el filtro <b>▼ de la columna MES</b> dentro del Excel.</p>
                             <details class="mt-2 text-xs text-slate-400">
                                 <summary class="cursor-pointer hover:text-slate-600">¿Prefieres solo un mes?</summary>
                                 <div class="mt-2 space-y-2">
@@ -131,7 +158,7 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                                     <div><label class="block text-[11px] uppercase text-slate-400">Mes</label>
                                         <select v-model="descarga.mes" class="w-full rounded-md border-slate-300 py-1 text-xs"><option v-for="m in 12" :key="m" :value="m">{{ meses[m] }}</option></select>
                                     </div>
-                                    <button type="button" @click="descargarPlantillaMensual" class="w-full rounded-md bg-slate-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-600">Descargar solo ese mes</button>
+                                    <button type="button" @click="descargarPlantillaMensual" :disabled="descargando" class="w-full rounded-md bg-slate-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-600 disabled:cursor-wait disabled:opacity-60">{{ descargando ? 'Generando…' : 'Descargar solo ese mes' }}</button>
                                 </div>
                             </details>
                         </div>

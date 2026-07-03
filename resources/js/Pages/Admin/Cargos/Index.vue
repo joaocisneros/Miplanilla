@@ -1,6 +1,7 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import CrudModal from '@/Components/CrudModal.vue';
+import BotonAccion from '@/Components/BotonAccion.vue';
 import { Head, useForm } from '@inertiajs/vue3';
 import { ref } from 'vue';
 
@@ -39,7 +40,7 @@ const inp = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm';
                             <td class="px-4 py-3 font-medium text-gray-900">{{ c.nombre }}</td>
                             <td class="px-4 py-3">{{ c.categoria ?? '—' }}</td>
                             <td class="px-4 py-3"><span :class="c.activo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'" class="rounded-full px-2 py-1 text-xs">{{ c.activo ? 'Activo' : 'Inactivo' }}</span></td>
-                            <td class="px-4 py-3 text-right"><button @click="abrirEditar(c)" class="text-indigo-600 hover:text-indigo-900">Editar</button><button @click="eliminar(c)" class="ml-3 text-red-600 hover:text-red-900">Eliminar</button></td>
+                            <td class="px-4 py-3 text-right"><div class="inline-flex gap-2"><BotonAccion variante="editar" @click="abrirEditar(c)" /><BotonAccion variante="eliminar" @click="eliminar(c)" /></div></td>
                         </tr>
                         <tr v-if="cargos.length === 0"><td colspan="4" class="px-4 py-6 text-center text-gray-500">Sin cargos todavía.</td></tr>
                     </tbody>

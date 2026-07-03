@@ -1,6 +1,7 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import CrudModal from '@/Components/CrudModal.vue';
+import BotonAccion from '@/Components/BotonAccion.vue';
 import { Head, useForm } from '@inertiajs/vue3';
 import { ref } from 'vue';
 
@@ -60,8 +61,7 @@ const inp = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm';
                             <td class="px-4 py-3"><span :class="e.regimen_laboral === 'microempresa' ? 'bg-amber-100 text-amber-800' : (e.regimen_laboral === 'pequena' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-700')" class="rounded-full px-2 py-1 text-xs font-medium">{{ etiquetaRegimen(e.regimen_laboral) }}</span></td>
                             <td class="px-4 py-3"><span :class="e.activo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'" class="rounded-full px-2 py-1 text-xs font-medium">{{ e.activo ? 'Activa' : 'Inactiva' }}</span></td>
                             <td class="px-4 py-3 text-right">
-                                <button @click="abrirEditar(e)" class="text-indigo-600 hover:text-indigo-900">Editar</button>
-                                <button @click="eliminar(e)" class="ml-3 text-red-600 hover:text-red-900">Eliminar</button>
+                                <div class="inline-flex gap-2"><BotonAccion variante="editar" @click="abrirEditar(e)" /><BotonAccion variante="eliminar" @click="eliminar(e)" /></div>
                             </td>
                         </tr>
                         <tr v-if="empresas.length === 0"><td colspan="5" class="px-4 py-6 text-center text-gray-500">No hay empresas registradas todavía.</td></tr>

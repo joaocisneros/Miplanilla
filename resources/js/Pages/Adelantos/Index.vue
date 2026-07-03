@@ -1,6 +1,7 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import CrudModal from '@/Components/CrudModal.vue';
+import BotonAccion from '@/Components/BotonAccion.vue';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
 
@@ -80,7 +81,7 @@ const inp = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm';
                             <td class="px-4 py-2 text-center text-gray-500">{{ r.cuota ?? '—' }}</td>
                             <td class="px-4 py-2 text-right font-semibold text-red-600">{{ money(r.monto) }}</td>
                             <td class="px-4 py-2 text-gray-500">{{ r.concepto }}</td>
-                            <td class="px-4 py-2 text-right"><button @click="eliminar(r)" class="text-red-600 hover:text-red-900">Eliminar</button></td>
+                            <td class="px-4 py-2 text-right"><BotonAccion variante="eliminar" @click="eliminar(r)" /></td>
                         </tr>
                         <tr v-if="registros.length === 0"><td colspan="7" class="px-4 py-6 text-center text-gray-500">Sin adelantos ni préstamos registrados.</td></tr>
                     </tbody>

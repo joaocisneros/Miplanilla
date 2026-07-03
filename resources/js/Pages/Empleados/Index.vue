@@ -1,6 +1,7 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import CrudModal from '@/Components/CrudModal.vue';
+import BotonAccion from '@/Components/BotonAccion.vue';
 import EmpleadoForm from '@/Components/EmpleadoForm.vue';
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
@@ -283,8 +284,10 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                             <td class="px-3 py-2 text-gray-700">{{ d.nombre_original }}</td>
                             <td class="px-3 py-2 text-gray-500">{{ d.fecha }}</td>
                             <td class="px-3 py-2 text-right whitespace-nowrap">
-                                <a :href="route('empleados.documentos.descargar', d.id)" class="text-indigo-600 hover:text-indigo-900">Descargar</a>
-                                <button v-if="puedeGestionar" @click="eliminarDoc(d)" class="ml-3 text-red-600 hover:text-red-900">Eliminar</button>
+                                <div class="inline-flex items-center gap-2">
+                                    <a :href="route('empleados.documentos.descargar', d.id)" class="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2.5 py-1.5 text-xs font-semibold text-slate-700 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-200"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-3.5 w-3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>Descargar</a>
+                                    <BotonAccion v-if="puedeGestionar" variante="eliminar" @click="eliminarDoc(d)" />
+                                </div>
                             </td>
                         </tr>
                         <tr v-if="!empDocs.documentos?.length"><td colspan="4" class="px-3 py-6 text-center text-gray-500">Aún no hay documentos archivados.</td></tr>

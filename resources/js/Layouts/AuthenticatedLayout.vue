@@ -3,9 +3,12 @@ import { ref, computed } from 'vue';
 import ApplicationLogo from '@/Components/ApplicationLogo.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
+import PerfilModal from '@/Components/PerfilModal.vue';
 import { Link, usePage } from '@inertiajs/vue3';
 
 const page = usePage();
+// Modal de "Mi perfil"
+const mostrarPerfil = ref(false);
 // En pantallas grandes arranca abierto; en celular/tablet arranca cerrado (para ver el contenido).
 const sidebarAbierto = ref(typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
 function cerrarEnMovil() {
@@ -14,6 +17,12 @@ function cerrarEnMovil() {
 
 const roles = computed(() => page.props.auth?.roles ?? []);
 const esAdmin = computed(() => roles.value.includes('ADMIN'));
+
+// Datos del usuario para el botón/menú de arriba
+const usuario = computed(() => page.props.auth.user);
+const inicialUsuario = computed(() => (usuario.value?.name || '?').charAt(0).toUpperCase());
+const nombreRol = { ADMIN: 'Administrador', RRHH: 'Recursos Humanos', SUPERVISOR: 'Supervisor', EMPLEADO: 'Empleado' };
+const rolPrincipal = computed(() => nombreRol[roles.value[0]] ?? (roles.value[0] || 'Usuario'));
 const permisos = computed(() => page.props.auth?.permissions ?? []);
 const can = (p) => permisos.value.includes(p);
 
@@ -52,6 +61,7 @@ const menu = computed(() => [
             { label: 'Pólizas Vida Ley', icon: '🪪', route: 'admin.polizas-vida-ley.index', active: 'admin.polizas-vida-ley.*', show: esAdmin.value },
             { label: 'Conceptos', icon: '🧮', route: 'admin.conceptos.index', active: 'admin.conceptos.*', show: esAdmin.value },
             { label: 'Usuarios', icon: '👤', route: 'admin.usuarios.index', active: 'admin.usuarios.*', show: esAdmin.value },
+            { label: 'Bitácora', icon: '📖', route: 'admin.auditoria.index', active: 'admin.auditoria.*', show: esAdmin.value },
         ],
     },
 ]);
@@ -72,7 +82,7 @@ const menu = computed(() => [
                 <span class="text-lg font-semibold text-white">MiPlanilla</span>
             </div>
 
-            <nav class="flex-1 overflow-y-auto px-3 py-4">
+            <nav class="sidebar-scroll flex-1 overflow-y-auto px-3 py-4">
                 <template v-for="grupo in menu" :key="grupo.titulo">
                     <div v-if="grupo.items.some((i) => i.show)" class="mb-6">
                         <p class="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-gray-500">{{ grupo.titulo }}</p>
@@ -124,16 +134,35 @@ const menu = computed(() => [
 
                 </div>
 
-                <Dropdown align="right" width="48">
+                <Dropdown align="right" width="60">
                     <template #trigger>
-                        <button class="inline-flex items-center rounded-md border border-transparent bg-white px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900">
-                            {{ page.props.auth.user.name }}
-                            <svg class="-me-0.5 ms-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                        <button class="inline-flex items-center gap-2.5 rounded-full border border-gray-200 bg-white py-1 pl-1 pr-3 transition hover:border-gray-300 hover:bg-gray-50">
+                            <span class="grid h-8 w-8 flex-none place-items-center rounded-full bg-gradient-to-br from-indigo-500 to-slate-800 text-sm font-bold text-white">{{ inicialUsuario }}</span>
+                            <span class="hidden text-left leading-tight sm:block">
+                                <span class="block text-sm font-semibold text-gray-800">{{ usuario.name }}</span>
+                                <span class="block text-xs text-gray-400">{{ rolPrincipal }}</span>
+                            </span>
+                            <svg class="h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
                         </button>
                     </template>
                     <template #content>
-                        <DropdownLink :href="route('profile.edit')">Perfil</DropdownLink>
-                        <DropdownLink :href="route('logout')" method="post" as="button">Cerrar sesión</DropdownLink>
+                        <!-- Encabezado del menú -->
+                        <div class="flex items-center gap-3 border-b border-gray-100 px-4 py-3">
+                            <span class="grid h-10 w-10 flex-none place-items-center rounded-full bg-gradient-to-br from-indigo-500 to-slate-800 text-base font-bold text-white">{{ inicialUsuario }}</span>
+                            <div class="min-w-0">
+                                <p class="truncate text-sm font-semibold text-gray-800">{{ usuario.name }}</p>
+                                <p class="truncate text-xs text-gray-500">{{ usuario.email }}</p>
+                                <span class="mt-1 inline-block rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-600">{{ rolPrincipal }}</span>
+                            </div>
+                        </div>
+                        <button type="button" @click="mostrarPerfil = true" class="flex w-full items-center gap-2 px-4 py-2.5 text-start text-sm text-gray-700 transition hover:bg-gray-100 focus:bg-gray-100 focus:outline-none">
+                            <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>
+                            Mi perfil
+                        </button>
+                        <Link :href="route('logout')" method="post" as="button" class="flex w-full items-center gap-2 border-t border-gray-100 px-4 py-2.5 text-start text-sm text-red-600 transition hover:bg-red-50 focus:bg-red-50 focus:outline-none">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" /></svg>
+                            Cerrar sesión
+                        </Link>
                     </template>
                 </Dropdown>
             </header>
@@ -152,5 +181,34 @@ const menu = computed(() => [
                 <slot />
             </main>
         </div>
+
+        <!-- Modal Mi perfil -->
+        <PerfilModal :show="mostrarPerfil" @close="mostrarPerfil = false" />
     </div>
 </template>
+
+<style scoped>
+/* Barra de desplazamiento fina y discreta para el menú lateral */
+.sidebar-scroll {
+    scrollbar-width: thin;                       /* Firefox */
+    scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+.sidebar-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+.sidebar-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.15);
+    border-radius: 9999px;
+}
+.sidebar-scroll:hover::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.3);
+}
+.sidebar-scroll::-webkit-scrollbar-button {
+    display: none;                                /* Oculta las flechitas arriba/abajo */
+    height: 0;
+    width: 0;
+}
+</style>

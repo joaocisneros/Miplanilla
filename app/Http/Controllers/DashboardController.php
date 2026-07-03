@@ -20,6 +20,9 @@ class DashboardController extends Controller
         $empresas = Empresa::orderBy('id')->get(['id', 'razon_social', 'nombre_comercial']);
         $nombre = fn ($e) => $e->nombre_comercial ?: $e->razon_social;
 
+        // IDs de empleados visibles (respeta el candado por empresa del usuario).
+        $empIds = Employee::pluck('id');
+
         // --- Trabajadores por empresa ---
         $porEmpresa = Employee::where('activo', true)
             ->select('empresa_id', DB::raw('count(*) as n'))->groupBy('empresa_id')->pluck('n', 'empresa_id');
@@ -55,6 +58,7 @@ class DashboardController extends Controller
 
         // --- AFP vs ONP (contratos activos) ---
         $pension = DB::table('contracts')->where('activo', true)
+            ->whereIn('employee_id', $empIds)
             ->select('sistema_pensiones', DB::raw('count(*) as n'))
             ->groupBy('sistema_pensiones')->pluck('n', 'sistema_pensiones');
         $pensionLabels = [];
@@ -65,8 +69,10 @@ class DashboardController extends Controller
         }
 
         // --- Asistencia (tardanzas y faltas registradas) ---
-        $tardanzas = DB::table('attendance')->where('minutos_tarde', '>', 0)->count();
-        $faltas = DB::table('attendance')->where('estado', 'like', 'FALTA%')->count();
+        $tardanzas = DB::table('attendance')->where('minutos_tarde', '>', 0)
+            ->whereIn('employee_id', $empIds)->count();
+        $faltas = DB::table('attendance')->where('estado', 'like', 'FALTA%')
+            ->whereIn('employee_id', $empIds)->count();
 
         return Inertia::render('Dashboard', [
             'stats' => [
