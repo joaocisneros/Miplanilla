@@ -19,8 +19,8 @@ class DatabaseSeeder extends Seeder
         }
 
         // 2) Usuarios: se crean SIEMPRE (aunque falle todo lo demás).
-        $this->crearUsuario('sistemasdesk04@gmail.com', 'Joao Cisneros', env('SUPER_ADMIN_PASSWORD', 'Cisneros0404'));
-        $this->crearUsuario('jvcisness@gmail.com', 'CISNEROS SUMA JAVIER', env('CLIENTE_PASSWORD', 'acs123456'));
+        $this->crearUsuario('sistemasdesk04@gmail.com', 'Joao Cisneros', 'Cisneros0404');
+        $this->crearUsuario('jvcisness@gmail.com', 'CISNEROS SUMA JAVIER', 'acs123456');
 
         // 3) Datos de ejemplo: si alguno falla, se avisa pero NO bloquea nada.
         foreach ([MaestrosSeeder::class, ConceptosSeeder::class, EmpresasSeeder::class, EmpleadosRealesSeeder::class] as $seeder) {
