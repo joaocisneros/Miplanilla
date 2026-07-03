@@ -8,21 +8,21 @@ chmod -R 775 storage bootstrap/cache || true
 # Enlace de storage (para archivos publicos)
 php artisan storage:link || true
 
-# Limpiar caches (NO se cachea route porque hay rutas con closure)
+# Limpiar y cachear config (NO se cachea route: hay rutas con closure)
 php artisan config:clear || true
 php artisan cache:clear || true
 php artisan config:cache || true
 
-# Migrar la base de datos (crea las tablas)
-php artisan migrate --force || echo "AVISO: migrate tuvo un problema (revisar)"
+# Detectar si el esquema esta completo (columna ultimo_acceso presente).
+# Si falta (esquema incompleto o base nueva), se reconstruye todo desde cero.
+COLCHECK=$(php artisan tinker --execute="try { echo \Illuminate\Support\Facades\Schema::hasColumn('users','ultimo_acceso') ? 'COMPLETO' : 'FALTA'; } catch (\Throwable \$e) { echo 'FALTA'; }" 2>/dev/null | tr -dc 'A-Z')
 
-# Sembrar datos de ejemplo SOLO la primera vez (si no hay empresas)
-EMPRESAS=$(php artisan tinker --execute="echo \App\Models\Empresa::count();" 2>/dev/null | tr -dc '0-9')
-if [ -z "$EMPRESAS" ] || [ "$EMPRESAS" = "0" ]; then
-  echo "==> Primera vez: sembrando datos de ejemplo..."
-  php artisan db:seed --force || echo "AVISO: seed tuvo un problema (revisar)"
+if [ "$COLCHECK" = "COMPLETO" ]; then
+  echo "==> Esquema completo: migrando normal (conserva datos)."
+  php artisan migrate --force || true
 else
-  echo "==> Ya hay datos ($EMPRESAS empresas), no se siembra."
+  echo "==> Esquema incompleto o base nueva: reconstruyendo desde cero..."
+  php artisan migrate:fresh --seed --force || php artisan migrate --force || true
 fi
 
 echo "==> Iniciando servidor en el puerto $PORT ..."
