@@ -25,11 +25,16 @@ class AppServiceProvider extends ServiceProvider
         Vite::prefetch(concurrency: 3);
 
         // Registra el último acceso de cada usuario al iniciar sesión.
+        // Protegido: si la columna aún no existe (migración pendiente), NO interrumpe el login.
         Event::listen(Login::class, function (Login $event) {
-            $event->user->forceFill([
-                'ultimo_acceso' => now(),
-                'ultimo_acceso_ip' => request()->ip(),
-            ])->saveQuietly();
+            try {
+                $event->user->forceFill([
+                    'ultimo_acceso' => now(),
+                    'ultimo_acceso_ip' => request()->ip(),
+                ])->saveQuietly();
+            } catch (\Throwable $e) {
+                // no hacer nada: el acceso continúa aunque falle el registro del último acceso
+            }
         });
     }
 }
