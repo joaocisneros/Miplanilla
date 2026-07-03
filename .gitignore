@@ -22,3 +22,10 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Documentos confidenciales del cliente (NO subir a repos)
+/EMPRESA-INFORMES EMPRESA
+EMPRESA-INFORMES EMPRESA/
+*.xlsx
+*.xlsm
+/shots

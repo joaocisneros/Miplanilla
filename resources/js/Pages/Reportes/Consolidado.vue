@@ -23,8 +23,8 @@ const meses = ['', 'Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Ago
     <Head title="Consolidado" />
     <AuthenticatedLayout>
         <template #header><h2 class="text-xl font-semibold text-gray-800">Reporte consolidado (todas las empresas)</h2></template>
-        <div class="py-8">
-            <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
+        <div class="p-6">
+            <div class="space-y-6">
                 <div class="rounded-lg bg-indigo-50 p-4 text-sm text-indigo-800">
                     Cada empresa se calcula de forma independiente (SUNAT/SUNAFIL audita por separado). Aquí solo se <b>suman los totales finales</b> de cada una.
                 </div>

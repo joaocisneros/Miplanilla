@@ -8,15 +8,23 @@ use Illuminate\Http\Request;
 
 class ContextoController extends Controller
 {
-    /** Fija la empresa activa en sesión (y limpia la sede si cambia). */
+    /** Fija la empresa activa en sesión (o "todas"). Limpia la sede al cambiar. */
     public function setEmpresa(Request $request)
     {
-        $data = $request->validate([
-            'empresa_id' => ['required', 'exists:empresas,id'],
-        ]);
-
-        $request->session()->put('empresa_id', (int) $data['empresa_id']);
+        $valor = $request->input('empresa_id');
         $request->session()->forget('sede_id');
+
+        // "todas" = vista consolidada de todas las empresas (solo lectura)
+        if ($valor === 'todas' || $valor === '' || $valor === null) {
+            $request->session()->put('empresa_modo', 'todas');
+            $request->session()->forget('empresa_id');
+
+            return back();
+        }
+
+        $request->validate(['empresa_id' => ['exists:empresas,id']]);
+        $request->session()->put('empresa_id', (int) $valor);
+        $request->session()->forget('empresa_modo');
 
         return back();
     }

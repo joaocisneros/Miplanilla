@@ -47,6 +47,8 @@ class TurnoController extends Controller
             'refrigerio_min' => ['required', 'integer', 'min:0', 'max:480'],
             'tolerancia_min' => ['required', 'integer', 'min:0', 'max:120'],
             'cruza_medianoche' => ['boolean'],
+            'trabaja_sabado' => ['boolean'],
+            'hora_salida_sabado' => ['nullable', 'date_format:H:i'],
             'activo' => ['boolean'],
         ]);
     }

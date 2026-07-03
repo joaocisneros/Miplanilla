@@ -15,6 +15,7 @@ class EmpresaController extends Controller
     {
         return Inertia::render('Admin/Empresas/Index', [
             'empresas' => Empresa::orderBy('razon_social')->get(),
+            'regimenes' => Empresa::REGIMENES,
         ]);
     }
 
@@ -48,6 +49,14 @@ class EmpresaController extends Controller
             'razon_social' => ['required', 'string', 'max:255'],
             'nombre_comercial' => ['nullable', 'string', 'max:255'],
             'direccion' => ['nullable', 'string', 'max:255'],
+            'representante_legal' => ['nullable', 'string', 'max:255'],
+            'representante_dni' => ['nullable', 'string', 'max:15'],
+            'representante_cargo' => ['nullable', 'string', 'max:255'],
+            'regimen_laboral' => ['required', Rule::in(array_keys(Empresa::REGIMENES))],
+            'remype_numero' => ['nullable', 'string', 'max:30'],
+            'remype_fecha' => ['nullable', 'date'],
+            'giro' => ['nullable', 'string', 'max:255'],
+            'modo_calculo' => ['required', Rule::in(['excel', 'legal'])],
             'activo' => ['boolean'],
         ]);
     }

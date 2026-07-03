@@ -29,4 +29,9 @@ class Attendance extends Model implements Auditable
     {
         return $this->belongsTo(Employee::class);
     }
+
+    public function empresa(): BelongsTo
+    {
+        return $this->belongsTo(Empresa::class);
+    }
 }

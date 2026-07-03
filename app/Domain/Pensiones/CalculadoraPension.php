@@ -26,6 +26,14 @@ class CalculadoraPension
         float $baseAfecta,
         Carbon $fechaPeriodo
     ): array {
+        // Sin sistema de pensiones (p. ej. pensionista jubilado exonerado de aporte).
+        if (in_array(strtoupper((string) $sistema), ['NINGUNO', 'NINGUNA', 'NONE', 'SIN', ''], true)) {
+            return [
+                'aporte' => 0.0, 'comision' => 0.0, 'prima' => 0.0, 'total' => 0.0,
+                'detalle' => ['sistema' => 'NINGUNO'],
+            ];
+        }
+
         if (strtoupper($sistema) === 'ONP') {
             $tasa = $this->tasaVigente('ONP', 'onp', $fechaPeriodo);
             $aporte = round($baseAfecta * ($tasa?->aporte_obligatorio ?? 0.13), 2);

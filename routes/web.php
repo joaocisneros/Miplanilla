@@ -5,13 +5,22 @@ use App\Http\Controllers\Admin\CargoController;
 use App\Http\Controllers\Admin\ConceptoController;
 use App\Http\Controllers\Admin\EmpresaController;
 use App\Http\Controllers\Admin\ParametroPeriodoController;
+use App\Http\Controllers\Admin\PolizaSctrController;
+use App\Http\Controllers\Admin\PolizaVidaLeyController;
 use App\Http\Controllers\Admin\SedeController;
 use App\Http\Controllers\Admin\TasaAfpController;
 use App\Http\Controllers\Admin\TurnoController;
+use App\Http\Controllers\Admin\UsuarioController;
+use App\Http\Controllers\AdelantoController;
+use App\Http\Controllers\IngresoAdicionalController;
 use App\Http\Controllers\AsistenciaController;
 use App\Http\Controllers\BoletaController;
-use App\Http\Controllers\ContextoController;
+use App\Http\Controllers\CtsController;
+use App\Http\Controllers\LiquidacionController;
+use App\Http\Controllers\VacacionController;
+use App\Http\Controllers\EmpleadoDocumentoController;
 use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\GratificacionController;
 use App\Http\Controllers\PlanillaController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReporteController;
@@ -20,56 +29,98 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::get('/', function () {
-    return Inertia::render('Welcome', [
-        'canLogin' => Route::has('login'),
-        'canRegister' => Route::has('register'),
-        'laravelVersion' => Application::VERSION,
-        'phpVersion' => PHP_VERSION,
-    ]);
+    // Si ya inició sesión va al panel; si no, al login (más directo para el cliente).
+    return auth()->check()
+        ? redirect()->route('dashboard')
+        : redirect()->route('login');
 });
 
-Route::get('/dashboard', function () {
-    return Inertia::render('Dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])
+    ->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
-    // Contexto: empresa/sede activa
-    Route::post('/contexto/empresa', [ContextoController::class, 'setEmpresa'])->name('contexto.empresa');
-    Route::post('/contexto/sede', [ContextoController::class, 'setSede'])->name('contexto.sede');
-
     // Empleados (RRHH/ADMIN gestionan; SUPERVISOR solo ve)
     Route::get('empleados', [EmployeeController::class, 'index'])->middleware('permission:empleados.ver')->name('empleados.index');
+    Route::get('empleados/export', [EmployeeController::class, 'export'])->middleware('permission:empleados.ver')->name('empleados.export');
+    Route::get('empleados/{empleado}/ficha', [EmpleadoDocumentoController::class, 'ficha'])->middleware('permission:empleados.ver')->name('empleados.ficha');
+    Route::get('empleados/{empleado}/contrato', [EmpleadoDocumentoController::class, 'contrato'])->middleware('permission:empleados.ver')->name('empleados.contrato');
+    Route::get('documentos/{documento}/descargar', [EmpleadoDocumentoController::class, 'descargar'])->middleware('permission:empleados.ver')->name('empleados.documentos.descargar');
     Route::middleware('permission:empleados.gestionar')->group(function () {
-        Route::get('empleados/nuevo', [EmployeeController::class, 'create'])->name('empleados.create');
         Route::post('empleados', [EmployeeController::class, 'store'])->name('empleados.store');
-        Route::get('empleados/{empleado}/editar', [EmployeeController::class, 'edit'])->name('empleados.edit');
         Route::put('empleados/{empleado}', [EmployeeController::class, 'update'])->name('empleados.update');
         Route::delete('empleados/{empleado}', [EmployeeController::class, 'destroy'])->name('empleados.destroy');
+        Route::post('empleados/{empleado}/documentos', [EmpleadoDocumentoController::class, 'subir'])->name('empleados.documentos.subir');
+        Route::delete('documentos/{documento}', [EmpleadoDocumentoController::class, 'eliminar'])->name('empleados.documentos.eliminar');
     });
 
-    // Asistencia (importación Excel = vía principal)
+    // Asistencia (registro diario manual + importación Excel/biométrico)
     Route::get('asistencia', [AsistenciaController::class, 'index'])->middleware('permission:asistencia.ver')->name('asistencia.index');
+    Route::get('asistencia/resumen', [AsistenciaController::class, 'resumen'])->middleware('permission:asistencia.ver')->name('asistencia.resumen');
+    Route::get('asistencia/diario', [AsistenciaController::class, 'diario'])->middleware('permission:asistencia.ver')->name('asistencia.diario');
+    Route::post('asistencia/diario', [AsistenciaController::class, 'guardarDiario'])->middleware('permission:asistencia.sincronizar|asistencia.justificar')->name('asistencia.diario.guardar');
+    Route::post('asistencia/empleado-mes', [AsistenciaController::class, 'guardarEmpleadoMes'])->middleware('permission:asistencia.sincronizar|asistencia.justificar')->name('asistencia.empleado-mes.guardar');
     Route::get('asistencia/plantilla', [AsistenciaController::class, 'plantilla'])->middleware('permission:asistencia.ver')->name('asistencia.plantilla');
     Route::post('asistencia/import', [AsistenciaController::class, 'import'])->middleware('permission:asistencia.sincronizar')->name('asistencia.import');
+    Route::get('asistencia/plantilla-marcaciones', [AsistenciaController::class, 'plantillaMarcaciones'])->middleware('permission:asistencia.ver')->name('asistencia.plantilla-marcaciones');
+    Route::post('asistencia/import-marcaciones', [AsistenciaController::class, 'importMarcaciones'])->middleware('permission:asistencia.sincronizar')->name('asistencia.import-marcaciones');
+    Route::get('asistencia/plantilla-resumen', [AsistenciaController::class, 'plantillaResumen'])->middleware('permission:asistencia.ver')->name('asistencia.plantilla-resumen');
+    Route::post('asistencia/import-resumen', [AsistenciaController::class, 'importResumen'])->middleware('permission:asistencia.sincronizar')->name('asistencia.import-resumen');
+    // Plantilla mensual (formato A: fila por día) + anual (pestaña por mes) + importador
+    Route::get('asistencia/plantilla-mensual', [AsistenciaController::class, 'plantillaMensual'])->middleware('permission:asistencia.ver')->name('asistencia.plantilla-mensual');
+    Route::get('asistencia/plantilla-anual', [AsistenciaController::class, 'plantillaAnual'])->middleware('permission:asistencia.ver')->name('asistencia.plantilla-anual');
+    Route::post('asistencia/import-mensual', [AsistenciaController::class, 'importMensual'])->middleware('permission:asistencia.sincronizar')->name('asistencia.import-mensual');
 
     // Planilla
     Route::get('planilla', [PlanillaController::class, 'index'])->middleware('permission:planilla.ver')->name('planilla.index');
     Route::get('planilla/{payroll}', [PlanillaController::class, 'show'])->middleware('permission:planilla.ver')->name('planilla.show');
     Route::middleware('permission:planilla.generar')->group(function () {
         Route::post('planilla/periodos', [PlanillaController::class, 'storePeriodo'])->name('planilla.periodos.store');
+        Route::post('planilla/generar-todas', [PlanillaController::class, 'generarTodas'])->name('planilla.generar-todas');
         Route::post('planilla/periodos/{periodo}/generar', [PlanillaController::class, 'generar'])->name('planilla.generar');
     });
     Route::post('planilla/{payroll}/cerrar', [PlanillaController::class, 'cerrar'])->middleware('permission:planilla.cerrar')->name('planilla.cerrar');
 
+    // Gratificaciones (Julio / Diciembre)
+    Route::get('gratificaciones', [GratificacionController::class, 'index'])->middleware('permission:planilla.ver')->name('gratificaciones.index');
+    Route::post('gratificaciones/generar', [GratificacionController::class, 'generar'])->middleware('permission:planilla.generar')->name('gratificaciones.generar');
+    Route::get('gratificaciones/{gratificacion}/pdf', [GratificacionController::class, 'pdf'])->middleware('permission:planilla.ver')->name('gratificaciones.pdf');
+
+    // CTS (mayo / noviembre)
+    Route::get('cts', [CtsController::class, 'index'])->middleware('permission:planilla.ver')->name('cts.index');
+    Route::post('cts/generar', [CtsController::class, 'generar'])->middleware('permission:planilla.generar')->name('cts.generar');
+    Route::get('cts/{ct}/pdf', [CtsController::class, 'pdf'])->middleware('permission:planilla.ver')->name('cts.pdf');
+
+    // Vacaciones
+    Route::get('vacaciones', [VacacionController::class, 'index'])->middleware('permission:planilla.ver')->name('vacaciones.index');
+    Route::post('vacaciones', [VacacionController::class, 'store'])->middleware('permission:planilla.generar')->name('vacaciones.store');
+    Route::delete('vacaciones/{vacacion}', [VacacionController::class, 'destroy'])->middleware('permission:planilla.generar')->name('vacaciones.destroy');
+
+    // Liquidación de cese
+    Route::get('liquidacion', [LiquidacionController::class, 'index'])->middleware('permission:planilla.ver')->name('liquidacion.index');
+    Route::get('liquidacion/pdf', [LiquidacionController::class, 'pdf'])->middleware('permission:planilla.ver')->name('liquidacion.pdf');
+
+    // Adelantos / préstamos
+    Route::get('adelantos', [AdelantoController::class, 'index'])->middleware('permission:planilla.ver')->name('adelantos.index');
+    Route::post('adelantos', [AdelantoController::class, 'store'])->middleware('permission:planilla.generar')->name('adelantos.store');
+    Route::delete('adelantos/grupo/{grupo}', [AdelantoController::class, 'destroyGrupo'])->middleware('permission:planilla.generar')->name('adelantos.destroy-grupo');
+    Route::delete('adelantos/{adelanto}', [AdelantoController::class, 'destroy'])->middleware('permission:planilla.generar')->name('adelantos.destroy');
+
+    // Ingresos adicionales aprobados por el supervisor (horas extra + bonos)
+    Route::get('adicionales', [IngresoAdicionalController::class, 'index'])->middleware('permission:planilla.ver')->name('adicionales.index');
+    Route::post('adicionales', [IngresoAdicionalController::class, 'store'])->middleware('permission:planilla.generar')->name('adicionales.store');
+
     // Boletas PDF
     Route::get('boletas/{detalle}/pdf', [BoletaController::class, 'pdf'])->middleware('permission:boletas.ver')->name('boletas.pdf');
+    Route::get('planilla/{payroll}/boletas-zip', [BoletaController::class, 'zip'])->middleware('permission:boletas.ver')->name('boletas.zip');
 
     // Reportes
     Route::get('reportes/consolidado', [ReporteController::class, 'consolidado'])->middleware('permission:reportes.ver')->name('reportes.consolidado');
+    Route::get('reportes/tributos', [ReporteController::class, 'tributos'])->middleware('permission:reportes.ver')->name('reportes.tributos');
+    Route::get('reportes/plame', [ReporteController::class, 'plame'])->middleware('permission:reportes.ver')->name('reportes.plame');
 });
 
 // Panel de administración (solo rol ADMIN)
@@ -78,6 +129,13 @@ Route::middleware(['auth', 'role:ADMIN'])->prefix('admin')->name('admin.')->grou
     Route::post('empresas', [EmpresaController::class, 'store'])->name('empresas.store');
     Route::put('empresas/{empresa}', [EmpresaController::class, 'update'])->name('empresas.update');
     Route::delete('empresas/{empresa}', [EmpresaController::class, 'destroy'])->name('empresas.destroy');
+
+    // Usuarios del sistema (crear y asignar rol)
+    Route::get('usuarios', [UsuarioController::class, 'index'])->name('usuarios.index');
+    Route::put('roles-permisos', [UsuarioController::class, 'actualizarPermisos'])->name('roles.permisos');
+    Route::post('usuarios', [UsuarioController::class, 'store'])->name('usuarios.store');
+    Route::put('usuarios/{usuario}', [UsuarioController::class, 'update'])->name('usuarios.update');
+    Route::delete('usuarios/{usuario}', [UsuarioController::class, 'destroy'])->name('usuarios.destroy');
 
     // Sedes (de la empresa activa)
     Route::get('sedes', [SedeController::class, 'index'])->name('sedes.index');
@@ -97,6 +155,18 @@ Route::middleware(['auth', 'role:ADMIN'])->prefix('admin')->name('admin.')->grou
 
     Route::get('conceptos', [ConceptoController::class, 'index'])->name('conceptos.index');
     Route::put('conceptos/{concepto}', [ConceptoController::class, 'update'])->name('conceptos.update');
+
+    // Pólizas SCTR
+    Route::get('polizas-sctr', [PolizaSctrController::class, 'index'])->name('polizas-sctr.index');
+    Route::post('polizas-sctr', [PolizaSctrController::class, 'store'])->name('polizas-sctr.store');
+    Route::put('polizas-sctr/{poliza}', [PolizaSctrController::class, 'update'])->name('polizas-sctr.update');
+    Route::delete('polizas-sctr/{poliza}', [PolizaSctrController::class, 'destroy'])->name('polizas-sctr.destroy');
+
+    // Pólizas Vida Ley
+    Route::get('polizas-vida-ley', [PolizaVidaLeyController::class, 'index'])->name('polizas-vida-ley.index');
+    Route::post('polizas-vida-ley', [PolizaVidaLeyController::class, 'store'])->name('polizas-vida-ley.store');
+    Route::put('polizas-vida-ley/{poliza}', [PolizaVidaLeyController::class, 'update'])->name('polizas-vida-ley.update');
+    Route::delete('polizas-vida-ley/{poliza}', [PolizaVidaLeyController::class, 'destroy'])->name('polizas-vida-ley.destroy');
 
     // Catálogos por empresa/globales
     Route::get('areas', [AreaController::class, 'index'])->name('areas.index');

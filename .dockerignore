@@ -1,0 +1,11 @@
+.git
+node_modules
+vendor
+.env
+.env.backup
+.env.production
+storage/logs/*.log
+tests
+EMPRESA-INFORMES EMPRESA
+shots
+*.md

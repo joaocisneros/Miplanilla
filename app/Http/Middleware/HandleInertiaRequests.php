@@ -38,7 +38,7 @@ class HandleInertiaRequests extends Middleware
                 'roles' => $request->user()?->getRoleNames() ?? [],
                 'permissions' => $request->user()?->getAllPermissions()->pluck('name') ?? [],
             ],
-            'contexto' => fn () => $this->contexto($request),
+            'listas' => fn () => $this->listas($request),
             'flash' => [
                 'success' => $request->session()->get('success'),
                 'error' => $request->session()->get('error'),
@@ -46,38 +46,18 @@ class HandleInertiaRequests extends Middleware
         ];
     }
 
-    /** Empresa/sede activa + listas para el selector (solo si hay sesión). */
-    private function contexto(Request $request): array
+    /** Listas globales para los filtros de cada módulo (empresas + sedes). */
+    private function listas(Request $request): array
     {
         if (! $request->user()) {
-            return ['empresas' => [], 'sedes' => [], 'empresa_id' => null, 'sede_id' => null];
-        }
-
-        $empresas = Empresa::where('activo', true)->orderBy('razon_social')
-            ->get(['id', 'razon_social', 'nombre_comercial']);
-
-        $empresaId = $request->session()->get('empresa_id');
-        if (! $empresaId || ! $empresas->contains('id', $empresaId)) {
-            $empresaId = $empresas->first()?->id;
-            $request->session()->put('empresa_id', $empresaId);
-        }
-
-        $sedes = $empresaId
-            ? Sede::where('empresa_id', $empresaId)->where('activo', true)
-                ->orderBy('nombre')->get(['id', 'nombre'])
-            : collect();
-
-        $sedeId = $request->session()->get('sede_id');
-        if ($sedeId && ! $sedes->contains('id', $sedeId)) {
-            $sedeId = null;
-            $request->session()->forget('sede_id');
+            return ['empresas' => [], 'sedes' => []];
         }
 
         return [
-            'empresas' => $empresas,
-            'sedes' => $sedes,
-            'empresa_id' => $empresaId,
-            'sede_id' => $sedeId,
+            'empresas' => Empresa::where('activo', true)->orderBy('razon_social')
+                ->get(['id', 'razon_social', 'nombre_comercial']),
+            'sedes' => Sede::where('activo', true)->orderBy('nombre')
+                ->get(['id', 'nombre', 'empresa_id']),
         ];
     }
 }

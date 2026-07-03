@@ -61,6 +61,11 @@ class Employee extends Model implements Auditable
         return $this->hasMany(Derechohabiente::class);
     }
 
+    public function documentos(): HasMany
+    {
+        return $this->hasMany(EmployeeDocument::class)->latest();
+    }
+
     /** Tiene derecho a asignación familiar: hijos < 18 o hasta 24 estudiando. */
     public function tieneAsignacionFamiliar(): bool
     {

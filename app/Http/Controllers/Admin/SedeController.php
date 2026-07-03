@@ -13,36 +13,41 @@ class SedeController extends Controller
 {
     public function index(Request $request): Response
     {
-        $empresaId = $request->session()->get('empresa_id');
+        $empresaId = $request->input('empresa_id') ?: null;
 
         return Inertia::render('Admin/Sedes/Index', [
-            'empresa' => Empresa::find($empresaId),
-            'sedes' => Sede::where('empresa_id', $empresaId)->orderBy('nombre')->get(),
+            'sedes' => Sede::with('empresa:id,razon_social,nombre_comercial')
+                ->when($empresaId, fn ($q) => $q->where('empresa_id', $empresaId))
+                ->orderBy('nombre')->get()
+                ->map(fn ($s) => [
+                    'id' => $s->id,
+                    'nombre' => $s->nombre,
+                    'direccion' => $s->direccion,
+                    'activo' => $s->activo,
+                    'empresa_id' => $s->empresa_id,
+                    'empresa' => $s->empresa?->nombre_comercial ?? $s->empresa?->razon_social,
+                ]),
+            'filtros' => ['empresa_id' => $empresaId],
+            'empresas' => Empresa::where('activo', true)->orderBy('razon_social')->get(['id', 'razon_social', 'nombre_comercial']),
         ]);
     }
 
     public function store(Request $request)
     {
-        $data = $this->validar($request);
-        $data['empresa_id'] = $request->session()->get('empresa_id');
-        abort_if(! $data['empresa_id'], 422, 'No hay empresa activa seleccionada.');
-
-        Sede::create($data);
+        Sede::create($this->validar($request));
 
         return back()->with('success', 'Sede registrada.');
     }
 
     public function update(Request $request, Sede $sede)
     {
-        $this->autorizarEmpresa($request, $sede);
         $sede->update($this->validar($request));
 
         return back()->with('success', 'Sede actualizada.');
     }
 
-    public function destroy(Request $request, Sede $sede)
+    public function destroy(Sede $sede)
     {
-        $this->autorizarEmpresa($request, $sede);
         $sede->delete();
 
         return back()->with('success', 'Sede eliminada.');
@@ -51,14 +56,10 @@ class SedeController extends Controller
     private function validar(Request $request): array
     {
         return $request->validate([
+            'empresa_id' => ['required', 'exists:empresas,id'],
             'nombre' => ['required', 'string', 'max:255'],
             'direccion' => ['nullable', 'string', 'max:255'],
             'activo' => ['boolean'],
         ]);
-    }
-
-    private function autorizarEmpresa(Request $request, Sede $sede): void
-    {
-        abort_if((int) $sede->empresa_id !== (int) $request->session()->get('empresa_id'), 403);
     }
 }

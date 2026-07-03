@@ -32,14 +32,17 @@ class MaestrosSeeder extends Seeder
         // --- Tasas AFP/ONP (referencia SBS; confirmar mes de devengue) ---
         $afps = [
             // afp, tipo, aporte, com_flujo, com_saldo, prima, rem_max
-            ['INTEGRA',   'mixta',  0.10, 0.0056, 0.0120, 0.0174, 9665.33],
-            ['INTEGRA',   'sueldo', 0.10, 0.0155, 0.0000, 0.0174, null],
-            ['PRIMA',     'mixta',  0.10, 0.0018, 0.0125, 0.0174, 9665.33],
-            ['PRIMA',     'sueldo', 0.10, 0.0160, 0.0000, 0.0174, null],
-            ['PROFUTURO', 'mixta',  0.10, 0.0067, 0.0120, 0.0174, 9665.33],
-            ['PROFUTURO', 'sueldo', 0.10, 0.0169, 0.0000, 0.0174, null],
-            ['HABITAT',   'mixta',  0.10, 0.0038, 0.0125, 0.0174, 9665.33],
-            ['HABITAT',   'sueldo', 0.10, 0.0147, 0.0000, 0.0174, null],
+            // prima_seguro 0.0137 = tasa real verificada en planilla ACS EIRL jun-2026
+            // MIXTA: comision_flujo=0 (en el esquema mixto la comisión es sobre el saldo anual,
+            //        no se descuenta del sueldo mensual) — verificado contra Excel del cliente.
+            ['INTEGRA',   'mixta',  0.10, 0.0000, 0.0120, 0.0137, 9665.33],
+            ['INTEGRA',   'sueldo', 0.10, 0.0155, 0.0000, 0.0137, null],
+            ['PRIMA',     'mixta',  0.10, 0.0000, 0.0125, 0.0137, 9665.33],
+            ['PRIMA',     'sueldo', 0.10, 0.0160, 0.0000, 0.0137, null],
+            ['PROFUTURO', 'mixta',  0.10, 0.0000, 0.0120, 0.0137, 9665.33],
+            ['PROFUTURO', 'sueldo', 0.10, 0.0169, 0.0000, 0.0137, null],
+            ['HABITAT',   'mixta',  0.10, 0.0000, 0.0125, 0.0137, 9665.33],
+            ['HABITAT',   'sueldo', 0.10, 0.0147, 0.0000, 0.0137, null],
             ['ONP',       'onp',    0.13, 0.0000, 0.0000, 0.0000, null],
         ];
         foreach ($afps as [$afp, $tipo, $aporte, $cf, $cs, $prima, $rmax]) {

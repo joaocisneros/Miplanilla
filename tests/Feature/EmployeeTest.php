@@ -44,6 +44,7 @@ class EmployeeTest extends TestCase
         $sede = Sede::create(['empresa_id' => $this->empresa->id, 'nombre' => 'Principal']);
 
         $this->actuarConEmpresa($this->rrhh())->post('/empleados', [
+            'empresa_id' => $this->empresa->id,
             'apellido_paterno' => 'CISNEROS',
             'apellido_materno' => 'PACOTAYPE',
             'nombres' => 'KEVIN',
@@ -72,6 +73,7 @@ class EmployeeTest extends TestCase
     public function test_afp_exige_tipo_flujo_o_mixta(): void
     {
         $this->actuarConEmpresa($this->rrhh())->post('/empleados', [
+            'empresa_id' => $this->empresa->id,
             'apellido_paterno' => 'X', 'nombres' => 'Y',
             'tipo_documento' => 'DNI', 'numero_documento' => '99999999',
             'categoria_ocupacional' => 'empleado', 'fecha_ingreso' => '2026-01-01',

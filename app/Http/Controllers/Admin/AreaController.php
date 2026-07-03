@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Area;
+use App\Models\Empresa;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -12,35 +13,41 @@ class AreaController extends Controller
 {
     public function index(Request $request): Response
     {
-        $empresaId = $request->session()->get('empresa_id');
+        $empresaId = $request->input('empresa_id') ?: null;
 
         return Inertia::render('Admin/Areas/Index', [
-            'areas' => Area::where('empresa_id', $empresaId)->orderBy('nombre')->get(),
+            'areas' => Area::with('empresa:id,razon_social,nombre_comercial')
+                ->when($empresaId, fn ($q) => $q->where('empresa_id', $empresaId))
+                ->orderBy('nombre')->get()
+                ->map(fn ($a) => [
+                    'id' => $a->id,
+                    'nombre' => $a->nombre,
+                    'es_riesgo' => $a->es_riesgo,
+                    'activo' => $a->activo,
+                    'empresa_id' => $a->empresa_id,
+                    'empresa' => $a->empresa?->nombre_comercial ?? $a->empresa?->razon_social,
+                ]),
+            'filtros' => ['empresa_id' => $empresaId],
+            'empresas' => Empresa::where('activo', true)->orderBy('razon_social')->get(['id', 'razon_social', 'nombre_comercial']),
         ]);
     }
 
     public function store(Request $request)
     {
-        $data = $this->validar($request);
-        $data['empresa_id'] = $request->session()->get('empresa_id');
-        abort_if(! $data['empresa_id'], 422, 'Selecciona una empresa activa.');
-
-        Area::create($data);
+        Area::create($this->validar($request));
 
         return back()->with('success', 'Área registrada.');
     }
 
     public function update(Request $request, Area $area)
     {
-        abort_if((int) $area->empresa_id !== (int) $request->session()->get('empresa_id'), 403);
         $area->update($this->validar($request));
 
         return back()->with('success', 'Área actualizada.');
     }
 
-    public function destroy(Request $request, Area $area)
+    public function destroy(Area $area)
     {
-        abort_if((int) $area->empresa_id !== (int) $request->session()->get('empresa_id'), 403);
         $area->delete();
 
         return back()->with('success', 'Área eliminada.');
@@ -49,6 +56,7 @@ class AreaController extends Controller
     private function validar(Request $request): array
     {
         return $request->validate([
+            'empresa_id' => ['required', 'exists:empresas,id'],
             'nombre' => ['required', 'string', 'max:255'],
             'es_riesgo' => ['boolean'],
             'activo' => ['boolean'],

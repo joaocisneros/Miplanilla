@@ -40,8 +40,8 @@ class AsistenciaImportTest extends TestCase
 
         $user = User::factory()->create()->assignRole('RRHH');
 
-        $this->actingAs($user)->withSession(['empresa_id' => $this->empresa->id])
-            ->post(route('asistencia.import'), ['archivo' => $file])
+        $this->actingAs($user)
+            ->post(route('asistencia.import'), ['empresa_id' => $this->empresa->id, 'archivo' => $file])
             ->assertRedirect();
 
         $this->assertTrue(
@@ -63,8 +63,8 @@ class AsistenciaImportTest extends TestCase
         $file = new UploadedFile($path, 'a.csv', 'text/csv', null, true);
         $user = User::factory()->create()->assignRole('RRHH');
 
-        $this->actingAs($user)->withSession(['empresa_id' => $this->empresa->id])
-            ->post(route('asistencia.import'), ['archivo' => $file])
+        $this->actingAs($user)
+            ->post(route('asistencia.import'), ['empresa_id' => $this->empresa->id, 'archivo' => $file])
             ->assertRedirect();
 
         $this->assertDatabaseCount('attendance', 0);

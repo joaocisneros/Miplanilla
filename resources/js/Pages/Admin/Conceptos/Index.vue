@@ -44,8 +44,8 @@ const colorTipo = (t) => ({
     <Head title="Conceptos de planilla" />
     <AuthenticatedLayout>
         <template #header><h2 class="text-xl font-semibold text-gray-800">Conceptos de planilla</h2></template>
-        <div class="py-8">
-            <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
+        <div class="p-6">
+            <div class="space-y-6">
                 <div class="rounded-lg bg-indigo-50 p-4 text-sm text-indigo-800">
                     Cada concepto define su <b>naturaleza remunerativa</b>. El motor arma cada base (AFP/ONP, EsSalud, SCTR, 5ta) sumando solo los conceptos marcados como afectos.
                 </div>

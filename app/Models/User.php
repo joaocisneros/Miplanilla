@@ -23,6 +23,8 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'ultimo_acceso',
+        'ultimo_acceso_ip',
     ];
 
     /**
@@ -44,7 +46,20 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'ultimo_acceso' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    /** Empleado vinculado a esta cuenta (si el usuario es un trabajador). */
+    public function empleado()
+    {
+        return $this->hasOne(\App\Models\Employee::class);
+    }
+
+    /** El super administrador (primer usuario) está protegido: no se puede borrar ni cambiar su rol. */
+    public function esSuperAdmin(): bool
+    {
+        return $this->id === 1;
     }
 }

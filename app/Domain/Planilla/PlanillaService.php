@@ -3,6 +3,7 @@
 namespace App\Domain\Planilla;
 
 use App\Domain\Tributario\Renta5taService;
+use App\Models\Adelanto;
 use App\Models\Attendance;
 use App\Models\Contract;
 use App\Models\Employee;
@@ -50,6 +51,9 @@ class PlanillaService
                 ->where('activo', true)
                 ->get();
 
+            // Modo de cálculo de la empresa: 'excel' (movilidad/adicionales NO afectos) o 'legal'.
+            $modoCalculo = \App\Models\Empresa::find($periodo->empresa_id)?->modo_calculo ?? 'excel';
+
             $tot = ['ing' => 0, 'desc' => 0, 'neto' => 0, 'apo' => 0, 'n' => 0];
 
             foreach ($empleados as $emp) {
@@ -62,16 +66,85 @@ class PlanillaService
 
                 $asigFam = $contrato->percibe_asignacion_familiar ? (float) ($param?->asignacion_familiar ?? 0) : 0;
 
+                // Retención de Renta 5ta — método acumulado (igual que el Excel del contador):
+                // proyección anual (12 sueldos + 2 gratificaciones + bonif. de ley 9%),
+                // menos lo ya retenido en meses previos, repartido en los meses que faltan.
+                // En periodos quincenales se retiene la mitad del mensual.
+                $uit = (float) ($param?->uit ?? 0);
+                $renta5ta = 0.0;
+
+                // Si el cliente cargó la Renta 5ta calculada aparte, se respeta ese valor.
+                $rentaManual = \App\Models\IngresoAdicional::where('empresa_id', $periodo->empresa_id)
+                    ->where('employee_id', $emp->id)
+                    ->where('anio', $periodo->anio)
+                    ->where('mes', $periodo->mes)
+                    ->where('quincena', $periodo->quincena)
+                    ->value('renta_5ta_manual');
+
+                if ($rentaManual !== null) {
+                    $renta5ta = (float) $rentaManual;
+                } elseif ($uit > 0) {
+                    $remMensual = (float) $contrato->sueldo_basico + $asigFam;
+                    // Gratificaciones (2) + bonificación extraordinaria de ley 9% sobre ellas.
+                    $otrosAnuales = 2 * $remMensual * 1.09;
+                    $retenidoPrevio = $this->retenidoPrevioAnio($periodo, $emp->id);
+                    $mesesRestantes = max(12 - $periodo->mes + 1, 1);
+
+                    $renta5taMensual = $this->renta5ta->retencionMensual(
+                        $remMensual, $uit, $periodo->mes, $periodo->fecha_inicio,
+                        otrosIngresosAnuales: $otrosAnuales,
+                        retenidoPrevio: $retenidoPrevio,
+                        mesesRestantes: $mesesRestantes
+                    );
+
+                    // La Renta 5ta se descuenta SOLO en la 2da quincena (o en planilla mensual).
+                    // En la 1ra quincena no se retiene nada.
+                    $renta5ta = $periodo->quincena == 1 ? 0.0 : $renta5taMensual;
+                }
+
+                // Adelantos / cuotas de préstamo a descontar en este periodo (mes).
+                $adelantos = (float) Adelanto::where('empresa_id', $periodo->empresa_id)
+                    ->where('employee_id', $emp->id)
+                    ->where('anio', $periodo->anio)
+                    ->where('mes', $periodo->mes)
+                    ->sum('monto');
+
+                // Ingresos adicionales aprobados por el supervisor (horas extra + bonos).
+                // Las horas extra solo se pagan si el supervisor las APROBÓ; el bono siempre.
+                $adic = \App\Models\IngresoAdicional::where('empresa_id', $periodo->empresa_id)
+                    ->where('employee_id', $emp->id)
+                    ->where('anio', $periodo->anio)
+                    ->where('mes', $periodo->mes)
+                    ->where('quincena', $periodo->quincena)
+                    ->first();
+                $montoHorasAprob = ($adic && $adic->aprobado) ? (float) $adic->monto_horas : 0.0;
+                $sabadoAdic = $adic ? (float) $adic->sabado : 0.0;
+                $domingoAdic = $adic ? (float) $adic->domingo_feriado : 0.0;
+                $bonoAdic = $adic ? (float) $adic->bono : 0.0;
+                $otrosAfectosAdic = $adic ? (float) $adic->otros_afectos : 0.0;
+
                 $entrada = [
+                    'modo' => $modoCalculo,
                     'sueldo_basico' => (float) $contrato->sueldo_basico,
                     'asignacion_familiar' => $asigFam,
                     'movilidad' => (float) $contrato->movilidad,
                     'dias_base' => $diasBase,
                     'dias_trabajados' => $ag['dias_trabajados'],
                     'minutos_tarde' => $ag['minutos_tarde'],
-                    'horas_extra_25' => $ag['horas_extra_25'],
-                    'horas_extra_35' => $ag['horas_extra_35'],
-                    'sistema_pensiones' => $contrato->sistema_pensiones ?? 'ONP',
+                    // H.E. APROBADAS del registro diario (con recargo 25%/35%). En modo 'excel'
+                    // el motor las suma a la bolsa de movilidad (no afectas). Si la fuente es
+                    // "resumen" estos vienen en 0 y las H.E. llegan por Adicionales (monto).
+                    'horas_extra_25' => $ag['horas_extra_25'] ?? 0,
+                    'horas_extra_35' => $ag['horas_extra_35'] ?? 0,
+                    // Bolsa de movilidad del cliente: sábados + domingos + horas extra + incentivo
+                    'mov_horas_extra' => $montoHorasAprob, // solo si el supervisor aprobó
+                    'mov_sabado' => $sabadoAdic,
+                    'mov_domingo' => $domingoAdic,
+                    'mov_incentivo' => $bonoAdic,
+                    // Ingreso afecto adicional (col. AG "otros pensionables/incentivos" del cliente)
+                    'otros_afectos' => $otrosAfectosAdic,
+                    // Si el contrato no define sistema, se asume ONP; 'NINGUNO' = exonerado.
+                    'sistema_pensiones' => $contrato->sistema_pensiones ?: 'ONP',
                     'afp' => $contrato->afp,
                     'tipo_afp' => $contrato->tipo_afp,
                     'aporta_sctr' => $contrato->aporta_sctr,
@@ -82,11 +155,28 @@ class PlanillaService
                     'sctr_tasa_salud' => (float) ($polizaSctr->tasa_salud ?? 0),
                     'vida_ley_tasa' => (float) ($polizaVida->tasa ?? 0),
                     'senati_tasa' => 0,
-                    'renta_5ta' => 0, // 5ta acumulada se aplica aparte cuando haya UIT confirmada
+                    'renta_5ta' => $renta5ta,
+                    'adelantos' => $adelantos,
                     'fecha_periodo' => $periodo->fecha_inicio,
                 ];
 
                 $r = $this->motor->calcular($entrada);
+
+                // Monto de las faltas (días no trabajados × valor día) para mostrarlo como descuento.
+                $valorDia = ((float) $contrato->sueldo_basico + $asigFam) / $diasBase;
+                $descFaltas = round($valorDia * ($ag['faltas'] ?? 0), 2);
+
+                // Resumen de asistencia para mostrarlo en el detalle/boleta.
+                $r['asistencia'] = [
+                    'dias_trabajados' => $ag['dias_trabajados'],
+                    'dias_periodo' => $diasPeriodo,
+                    'faltas' => $ag['faltas'] ?? 0,
+                    'minutos_tarde' => $ag['minutos_tarde'],
+                    'horas_extra' => round(($ag['horas_extra_25'] ?? 0) + ($ag['horas_extra_35'] ?? 0), 2),
+                    'descuento_faltas' => $descFaltas,
+                    'remuneracion_periodo' => round($r['ingresos']['remuneracion_devengada'] + $descFaltas, 2),
+                    'fuente' => $ag['fuente'] ?? 'diario',
+                ];
 
                 $payroll->detalles()->create([
                     'employee_id' => $emp->id,
@@ -124,9 +214,49 @@ class PlanillaService
         });
     }
 
+    /**
+     * Suma de la Renta 5ta ya retenida a un trabajador en MESES ANTERIORES del mismo año
+     * (incluye ambas quincenas de cada mes previo). No cuenta el mes actual, para que en
+     * planillas quincenales las dos quincenas del mes no se resten entre sí.
+     */
+    private function retenidoPrevioAnio(Periodo $periodo, int $employeeId): float
+    {
+        return (float) \App\Models\PayrollDetail::where('employee_id', $employeeId)
+            ->whereHas('payroll.periodo', function ($q) use ($periodo) {
+                $q->where('empresa_id', $periodo->empresa_id)
+                    ->where('anio', $periodo->anio)
+                    ->where('mes', '<', $periodo->mes);
+                // Solo el mismo tipo de planilla, para no mezclar mensual con quincenal.
+                $periodo->quincena ? $q->whereNotNull('quincena') : $q->whereNull('quincena');
+            })
+            ->sum('renta_5ta');
+    }
+
     /** Agrega la asistencia del empleado en el periodo. */
     private function agregarAsistencia(int $employeeId, Periodo $periodo, int $diasPeriodo): array
     {
+        // 1) Si existe un CUADRO RESUMEN importado para este periodo, es la fuente exacta.
+        $resumen = \App\Models\AsistenciaResumen::where('empresa_id', $periodo->empresa_id)
+            ->where('employee_id', $employeeId)
+            ->where('anio', $periodo->anio)
+            ->where('mes', $periodo->mes)
+            ->where('quincena', $periodo->quincena)
+            ->first();
+
+        if ($resumen) {
+            // Las horas extra NO se toman aquí: fluyen por IngresoAdicional (pantalla #7),
+            // que ya las aprueba y valoriza. Así se evita contarlas dos veces.
+            return [
+                'dias_trabajados' => (float) $resumen->dias_trabajados,
+                'minutos_tarde' => (int) $resumen->tardanza_min,
+                'horas_extra_25' => 0.0,
+                'horas_extra_35' => 0.0,
+                'faltas' => (int) $resumen->faltas,
+                'fuente' => 'resumen',
+            ];
+        }
+
+        // 2) Si no hay resumen, se agrega desde el registro diario.
         $registros = Attendance::where('employee_id', $employeeId)
             ->whereBetween('fecha', [$periodo->fecha_inicio->toDateString(), $periodo->fecha_fin->toDateString()])
             ->get();
@@ -142,12 +272,13 @@ class PlanillaService
             ? $diasPeriodo
             : max($diasPeriodo - $noPagados, 0);
 
-        // Horas extra por tramo (25% primeras 2h/día, 35% el resto). v1: cuenta todas.
+        // Horas extra por tramo (25% primeras 2h/día, 35% el resto).
+        // Solo cuentan las H.E. APROBADAS por el supervisor (check en el registro diario).
         $he25 = 0.0;
         $he35 = 0.0;
         foreach ($registros as $r) {
             $he = (float) $r->horas_extra;
-            if ($he <= 0) {
+            if ($he <= 0 || ! $r->horas_extra_aprobadas) {
                 continue;
             }
             $he25 += min($he, 2);
@@ -159,6 +290,8 @@ class PlanillaService
             'minutos_tarde' => $minutosTarde,
             'horas_extra_25' => $he25,
             'horas_extra_35' => $he35,
+            'faltas' => $noPagados,
+            'fuente' => 'diario',
         ];
     }
 }
