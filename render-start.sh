@@ -13,9 +13,12 @@ php artisan config:clear || true
 php artisan cache:clear || true
 php artisan config:cache || true
 
-# Reconstruir la base completa y sembrar usuarios/datos.
-# (Fase de pruebas: se reconstruye en cada despliegue para garantizar un estado limpio.)
-php artisan migrate:fresh --seed --force || php artisan migrate --force || true
+# Reconstruir el esquema (separado del seed para que el seed corra aunque una migracion falle)
+echo "==> Migrando base de datos..."
+php artisan migrate:fresh --force || php artisan migrate --force || true
+
+echo "==> Sembrando roles, usuarios y datos..."
+php artisan db:seed --force || true
 
 echo "==> Iniciando servidor en el puerto $PORT ..."
 php artisan serve --host=0.0.0.0 --port="$PORT"
