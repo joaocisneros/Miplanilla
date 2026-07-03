@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 echo "==> Preparando MiPlanilla en Render..."
 
+# Crear carpetas de almacenamiento que necesitan session/cache/views en modo archivo
+mkdir -p storage/framework/sessions storage/framework/cache/data storage/framework/views storage/logs bootstrap/cache
+chmod -R 775 storage bootstrap/cache || true
+
 # Enlace de storage (para archivos publicos)
 php artisan storage:link || true
 

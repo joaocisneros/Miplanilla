@@ -15,7 +15,7 @@ services:
       - key: APP_ENV
         value: production
       - key: APP_DEBUG
-        value: "false"
+        value: "true"
       - key: APP_KEY
         value: base64:l/gLoagjGlz7C1WvT9Wzmmiw08AtA71hMsO3jF/DTAY=
       - key: APP_LOCALE
