@@ -13,16 +13,16 @@ php artisan config:clear || true
 php artisan cache:clear || true
 php artisan config:cache || true
 
-# Detectar si el esquema esta completo (columna ultimo_acceso presente).
-# Si falta (esquema incompleto o base nueva), se reconstruye todo desde cero.
-COLCHECK=$(php artisan tinker --execute="try { echo \Illuminate\Support\Facades\Schema::hasColumn('users','ultimo_acceso') ? 'COMPLETO' : 'FALTA'; } catch (\Throwable \$e) { echo 'FALTA'; }" 2>/dev/null | tr -dc 'A-Z')
+# Reconstruir la base si el esquema esta incompleto (falta ultimo_acceso)
+# o si aun no existe el super admin. Si ya esta todo, solo migra (conserva datos).
+CHECK=$(php artisan tinker --execute="try { echo (\Illuminate\Support\Facades\Schema::hasColumn('users','ultimo_acceso') && \App\Models\User::where('email','sistemasdesk04@gmail.com')->exists()) ? 'OK' : 'REBUILD'; } catch (\Throwable \$e) { echo 'REBUILD'; }" 2>/dev/null | tr -dc 'A-Z')
 
-if [ "$COLCHECK" = "COMPLETO" ]; then
-  echo "==> Esquema completo: migrando normal (conserva datos)."
+if [ "$CHECK" = "OK" ]; then
+  echo "==> Todo en orden: migrando normal (conserva datos)."
   php artisan migrate --force || true
 else
-  echo "==> Esquema incompleto o base nueva: reconstruyendo desde cero..."
-  php artisan migrate:fresh --seed --force || php artisan migrate --force || true
+  echo "==> Reconstruyendo base y usuarios desde cero..."
+  php artisan migrate:fresh --seed --force || true
 fi
 
 echo "==> Iniciando servidor en el puerto $PORT ..."
