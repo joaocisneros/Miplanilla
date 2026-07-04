@@ -119,6 +119,7 @@ Route::middleware('auth')->group(function () {
 
     // Reportes
     Route::get('reportes/consolidado', [ReporteController::class, 'consolidado'])->middleware('permission:reportes.ver')->name('reportes.consolidado');
+    Route::get('reportes/consolidado/export', [ReporteController::class, 'consolidadoExport'])->middleware('permission:reportes.ver')->name('reportes.consolidado.export');
     Route::get('reportes/tributos', [ReporteController::class, 'tributos'])->middleware('permission:reportes.ver')->name('reportes.tributos');
     Route::get('reportes/plame', [ReporteController::class, 'plame'])->middleware('permission:reportes.ver')->name('reportes.plame');
 });

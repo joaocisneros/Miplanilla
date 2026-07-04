@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\PlantillaExport;
 use App\Models\Empresa;
 use App\Models\Payroll;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -19,37 +21,93 @@ class ReporteController extends Controller
     {
         $anio = (int) $request->input('anio', now()->year);
         $mes = (int) $request->input('mes', now()->month);
-
-        $payrolls = Payroll::with(['empresa:id,razon_social', 'periodo', 'detalles:id,payroll_id,employee_id'])
-            ->whereHas('periodo', fn ($q) => $q->where('anio', $anio)->where('mes', $mes))
-            ->get();
-
-        $porEmpresa = $payrolls->groupBy('empresa_id')->map(function ($grupo) {
-            $emp = $grupo->first()->empresa;
-            return [
-                'empresa' => $emp->razon_social,
-                // Trabajadores ÚNICOS (no se suman las quincenas; un trabajador cuenta una vez).
-                'cantidad_empleados' => $grupo->flatMap->detalles->pluck('employee_id')->unique()->count(),
-                'total_ingresos' => round($grupo->sum('total_ingresos'), 2),
-                'total_descuentos' => round($grupo->sum('total_descuentos'), 2),
-                'total_neto' => round($grupo->sum('total_neto'), 2),
-                'total_aportes_empleador' => round($grupo->sum('total_aportes_empleador'), 2),
-            ];
-        })->values();
-
-        $totalGeneral = [
-            'cantidad_empleados' => $porEmpresa->sum('cantidad_empleados'),
-            'total_ingresos' => round($porEmpresa->sum('total_ingresos'), 2),
-            'total_descuentos' => round($porEmpresa->sum('total_descuentos'), 2),
-            'total_neto' => round($porEmpresa->sum('total_neto'), 2),
-            'total_aportes_empleador' => round($porEmpresa->sum('total_aportes_empleador'), 2),
-        ];
+        [$porEmpresa, $totalGeneral] = $this->datosConsolidado($anio, $mes);
 
         return Inertia::render('Reportes/Consolidado', [
             'porEmpresa' => $porEmpresa,
             'totalGeneral' => $totalGeneral,
             'filtros' => ['anio' => $anio, 'mes' => $mes],
         ]);
+    }
+
+    /** Exporta el consolidado (con gastos y costo total) a Excel. */
+    public function consolidadoExport(Request $request)
+    {
+        $anio = (int) $request->input('anio', now()->year);
+        $mes = (int) $request->input('mes', now()->month);
+        [$porEmpresa, $totalGeneral] = $this->datosConsolidado($anio, $mes);
+
+        $headings = ['Empresa', 'Empleados', 'Ingresos', 'Descuentos', 'Neto a pagar',
+            'EsSalud', 'SCTR', 'Vida Ley', 'SENATI', 'Aportes empleador', 'COSTO TOTAL'];
+        $rows = $porEmpresa->map(fn ($e) => [
+            $e['empresa'], $e['cantidad_empleados'], $e['total_ingresos'], $e['total_descuentos'],
+            $e['total_neto'], $e['essalud'], $e['sctr'], $e['vida_ley'], $e['senati'],
+            $e['total_aportes_empleador'], $e['costo_total'],
+        ])->values()->all();
+        $rows[] = ['TOTAL GENERAL', $totalGeneral['cantidad_empleados'], $totalGeneral['total_ingresos'],
+            $totalGeneral['total_descuentos'], $totalGeneral['total_neto'], $totalGeneral['essalud'],
+            $totalGeneral['sctr'], $totalGeneral['vida_ley'], $totalGeneral['senati'],
+            $totalGeneral['total_aportes_empleador'], $totalGeneral['costo_total']];
+
+        return Excel::download(new PlantillaExport($headings, $rows), "consolidado_{$anio}_{$mes}.xlsx");
+    }
+
+    /**
+     * Calcula el consolidado por empresa con el desglose de gastos del empleador
+     * (EsSalud, SCTR, Vida Ley, SENATI) y el COSTO TOTAL real de la planilla.
+     *
+     * @return array{0: \Illuminate\Support\Collection, 1: array}
+     */
+    private function datosConsolidado(int $anio, int $mes): array
+    {
+        $payrolls = Payroll::with(['empresa:id,razon_social', 'periodo', 'detalles'])
+            ->whereHas('periodo', fn ($q) => $q->where('anio', $anio)->where('mes', $mes))
+            ->get();
+
+        $porEmpresa = $payrolls->groupBy('empresa_id')->map(function ($grupo) {
+            $emp = $grupo->first()->empresa;
+            $det = $grupo->flatMap->detalles;
+            $sum = fn ($col) => round($det->sum(fn ($d) => (float) $d->$col), 2);
+
+            $ingresos = $sum('total_ingresos');
+            $essalud = $sum('essalud');
+            $sctr = round($sum('sctr_pension') + $sum('sctr_salud'), 2);
+            $vida = $sum('vida_ley');
+            $senati = $sum('senati');
+            $aportes = round($essalud + $sctr + $vida + $senati, 2);
+
+            return [
+                'empresa' => $emp->razon_social,
+                // Trabajadores ÚNICOS (un trabajador cuenta una vez, no por quincena).
+                'cantidad_empleados' => $det->pluck('employee_id')->unique()->count(),
+                'total_ingresos' => $ingresos,
+                'total_descuentos' => $sum('total_descuentos'),
+                'total_neto' => $sum('neto'),
+                'essalud' => $essalud,
+                'sctr' => $sctr,
+                'vida_ley' => $vida,
+                'senati' => $senati,
+                'total_aportes_empleador' => $aportes,
+                // Lo que REALMENTE le cuesta la planilla a la empresa: bruto + aportes.
+                'costo_total' => round($ingresos + $aportes, 2),
+            ];
+        })->values();
+
+        $suma = fn ($c) => round($porEmpresa->sum($c), 2);
+        $totalGeneral = [
+            'cantidad_empleados' => $porEmpresa->sum('cantidad_empleados'),
+            'total_ingresos' => $suma('total_ingresos'),
+            'total_descuentos' => $suma('total_descuentos'),
+            'total_neto' => $suma('total_neto'),
+            'essalud' => $suma('essalud'),
+            'sctr' => $suma('sctr'),
+            'vida_ley' => $suma('vida_ley'),
+            'senati' => $suma('senati'),
+            'total_aportes_empleador' => $suma('total_aportes_empleador'),
+            'costo_total' => $suma('costo_total'),
+        ];
+
+        return [$porEmpresa, $totalGeneral];
     }
 
     /**
