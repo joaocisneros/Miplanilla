@@ -37,7 +37,10 @@ function verDetalle(d) {
                     <Link :href="route('planilla.index')" class="text-sm text-indigo-600">&larr; Planilla</Link>
                     <h2 class="text-xl font-semibold text-gray-800">{{ payroll.descripcion }} — {{ payroll.empresa }}</h2>
                 </div>
-                <a :href="route('boletas.zip', payroll.id)" class="rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700">⬇ Descargar todas las boletas (ZIP)</a>
+                <div class="flex items-center gap-2">
+                    <a :href="route('planilla.detalle-excel', payroll.id)" class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">📥 Planilla detallada (Excel)</a>
+                    <a :href="route('boletas.zip', payroll.id)" class="rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700">⬇ Boletas (ZIP)</a>
+                </div>
             </div>
         </template>
         <div class="p-6">

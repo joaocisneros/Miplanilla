@@ -3,12 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Planilla\PlanillaService;
+use App\Exports\PlanillaDetalleExport;
 use App\Models\Empresa;
 use App\Models\Payroll;
 use App\Models\Periodo;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
+use Maatwebsite\Excel\Facades\Excel;
 
 class PlanillaController extends Controller
 {
@@ -137,6 +140,87 @@ class PlanillaController extends Controller
                 ];
             }),
         ]);
+    }
+
+    /**
+     * Exporta la planilla DETALLADA a Excel: una fila por trabajador con todas
+     * sus columnas (básico, movilidad, HE, sábado, incentivos, pensión, renta 5ta,
+     * adelantos, neto, aportes del empleador). Es el "extraíble a Excel" del cliente.
+     */
+    public function exportDetalle(Payroll $payroll)
+    {
+        @set_time_limit(180);
+        $payroll->load([
+            'periodo', 'empresa',
+            'detalles.employee:id,numero_documento,apellido_paterno,apellido_materno,nombres',
+            'detalles.employee.contratoVigente.cargo:id,nombre',
+        ]);
+
+        $n = fn ($v) => round((float) $v, 2);
+
+        $headings = [
+            'N°', 'DNI', 'Apellidos y Nombres', 'Cargo', 'Sistema',
+            'Sueldo devengado', 'Movilidad', 'H. Extra', 'Sábado', 'Dom/Fer', 'Incentivo/Bono', 'Gratificación', 'Vacaciones',
+            'TOTAL INGRESOS',
+            'Días trab.', 'Faltas', 'Tardanza (min)',
+            'Aporte pensión', 'Comisión', 'Prima', 'Renta 5ta', 'Adelantos', 'Desc. tardanza',
+            'TOTAL DESCUENTOS', 'Reintegros', 'NETO A PAGAR',
+            'EsSalud', 'SCTR', 'Vida Ley',
+        ];
+
+        $rows = [];
+        $i = 1;
+        foreach ($payroll->detalles as $d) {
+            $e = $d->employee;
+            $c = $e?->contratoVigente->first();
+            $g = (array) $d->desglose;
+            $ing = $g['ingresos'] ?? [];
+            $desc = $g['descuentos'] ?? [];
+            $pen = $desc['pension'] ?? [];
+            $penDet = $pen['detalle'] ?? [];
+            $asis = $g['asistencia'] ?? [];
+            $ap = $g['aportes_empleador'] ?? [];
+            $sistema = ($penDet['sistema'] ?? '') === 'AFP' ? 'AFP '.($penDet['afp'] ?? '') : ($penDet['sistema'] ?? 'ONP');
+
+            $rows[] = [
+                $i++,
+                (string) $e?->numero_documento,
+                $e?->nombre_completo,
+                $c?->cargo?->nombre ?? '',
+                trim($sistema),
+                $n($ing['remuneracion_devengada'] ?? 0),
+                $n($ing['movilidad'] ?? 0),
+                $n($ing['horas_extra'] ?? 0),
+                $n($ing['sabado'] ?? 0),
+                $n($ing['domingo_feriado'] ?? 0),
+                $n($ing['incentivos'] ?? 0),
+                $n($ing['gratificacion'] ?? 0),
+                $n($ing['vacaciones'] ?? 0),
+                $n($d->total_ingresos),
+                $asis['dias_trabajados'] ?? ($g['dias_trabajados'] ?? 0),
+                $asis['faltas'] ?? 0,
+                $asis['minutos_tarde'] ?? 0,
+                $n($pen['aporte'] ?? 0),
+                $n($pen['comision'] ?? 0),
+                $n($pen['prima'] ?? 0),
+                $n($desc['renta_5ta'] ?? 0),
+                $n($desc['adelantos'] ?? 0),
+                $n($desc['tardanza'] ?? 0),
+                $n($d->total_descuentos),
+                $n($g['reintegros'] ?? 0),
+                $n($d->neto),
+                $n($ap['essalud'] ?? 0),
+                $n(($ap['sctr_pension'] ?? 0) + ($ap['sctr_salud'] ?? 0)),
+                $n($ap['vida_ley'] ?? 0),
+            ];
+        }
+
+        $nombre = 'planilla_detallada_'.Str::slug($payroll->empresa->razon_social).'_'.Str::slug($payroll->periodo->descripcion).'.xlsx';
+
+        // Columnas de dinero (1-based) y columna del NETO para el formato/color.
+        $moneyCols = [6, 7, 8, 9, 10, 11, 12, 13, 14, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29];
+
+        return Excel::download(new PlanillaDetalleExport($headings, $rows, $moneyCols, 26), $nombre);
     }
 
     public function cerrar(Request $request, Payroll $payroll)

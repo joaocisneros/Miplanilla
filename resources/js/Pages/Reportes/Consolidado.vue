@@ -16,13 +16,32 @@ function filtrar() {
     router.get(route('reportes.consolidado'), { anio: anio.value, mes: mes.value }, { preserveState: true });
 }
 function exportar() {
-    window.location.href = route('reportes.consolidado.export', { anio: anio.value, mes: mes.value });
+    // Respeta la pestaña activa: "todas" exporta las 3, o solo la empresa seleccionada.
+    window.location.href = route('reportes.consolidado.export', {
+        anio: anio.value,
+        mes: mes.value,
+        empresa: empresaActiva.value !== 'todas' ? empresaActiva.value : undefined,
+    });
 }
 
 const money = (v) => 'S/ ' + Number(v ?? 0).toLocaleString('es-PE', { minimumFractionDigits: 2 });
 const meses = ['', 'Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
 const hayDatos = computed(() => props.porEmpresa.length > 0);
+
+// Pestañas por empresa (sin desplegable): "todas" o una empresa concreta.
+const empresaActiva = ref('todas');
+const mostradas = computed(() =>
+    empresaActiva.value === 'todas'
+        ? props.porEmpresa
+        : props.porEmpresa.filter((e) => e.empresa === empresaActiva.value),
+);
+// Resumen para las tarjetas: total general (todas) o la empresa seleccionada.
+const resumen = computed(() =>
+    empresaActiva.value === 'todas'
+        ? props.totalGeneral
+        : (props.porEmpresa.find((e) => e.empresa === empresaActiva.value) ?? {}),
+);
 </script>
 
 <template>
@@ -44,23 +63,39 @@ const hayDatos = computed(() => props.porEmpresa.length > 0);
                 </div>
 
                 <template v-if="hayDatos">
-                    <!-- KPIs -->
+                    <!-- Pestañas por empresa (sin desplegable) -->
+                    <div class="flex flex-wrap gap-2">
+                        <button
+                            @click="empresaActiva = 'todas'"
+                            :class="empresaActiva === 'todas' ? 'bg-slate-900 text-white' : 'bg-white text-gray-600 ring-1 ring-inset ring-gray-200 hover:bg-gray-50'"
+                            class="rounded-lg px-4 py-2 text-sm font-semibold transition"
+                        >🏢 Todas</button>
+                        <button
+                            v-for="e in porEmpresa"
+                            :key="e.empresa"
+                            @click="empresaActiva = e.empresa"
+                            :class="empresaActiva === e.empresa ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 ring-1 ring-inset ring-gray-200 hover:bg-gray-50'"
+                            class="rounded-lg px-4 py-2 text-sm font-semibold transition"
+                        >{{ e.empresa }}</button>
+                    </div>
+
+                    <!-- KPIs (de la pestaña activa) -->
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                         <div class="rounded-lg bg-white p-4 shadow-sm">
-                            <p class="text-xs uppercase tracking-wide text-gray-400">Costo total (todas)</p>
-                            <p class="mt-1 text-2xl font-bold text-indigo-700">{{ money(totalGeneral.costo_total) }}</p>
+                            <p class="text-xs uppercase tracking-wide text-gray-400">Costo total {{ empresaActiva === 'todas' ? '(todas)' : '' }}</p>
+                            <p class="mt-1 text-2xl font-bold text-indigo-700">{{ money(resumen.costo_total) }}</p>
                         </div>
                         <div class="rounded-lg bg-white p-4 shadow-sm">
                             <p class="text-xs uppercase tracking-wide text-gray-400">Neto a trabajadores</p>
-                            <p class="mt-1 text-2xl font-bold text-green-700">{{ money(totalGeneral.total_neto) }}</p>
+                            <p class="mt-1 text-2xl font-bold text-green-700">{{ money(resumen.total_neto) }}</p>
                         </div>
                         <div class="rounded-lg bg-white p-4 shadow-sm">
                             <p class="text-xs uppercase tracking-wide text-gray-400">Aportes del empleador</p>
-                            <p class="mt-1 text-2xl font-bold text-blue-700">{{ money(totalGeneral.total_aportes_empleador) }}</p>
+                            <p class="mt-1 text-2xl font-bold text-blue-700">{{ money(resumen.total_aportes_empleador) }}</p>
                         </div>
                         <div class="rounded-lg bg-white p-4 shadow-sm">
                             <p class="text-xs uppercase tracking-wide text-gray-400">Trabajadores</p>
-                            <p class="mt-1 text-2xl font-bold text-gray-800">{{ totalGeneral.cantidad_empleados }}</p>
+                            <p class="mt-1 text-2xl font-bold text-gray-800">{{ resumen.cantidad_empleados }}</p>
                         </div>
                     </div>
 
@@ -72,6 +107,7 @@ const hayDatos = computed(() => props.porEmpresa.length > 0);
                         <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
                             <tr>
                                 <th class="px-3 py-3">Empresa</th>
+                                <th class="px-3 py-3">RUC</th>
                                 <th class="px-3 py-3 text-center">Trab.</th>
                                 <th class="px-3 py-3 text-right">Ingresos</th>
                                 <th class="px-3 py-3 text-right">Descuentos</th>
@@ -85,8 +121,9 @@ const hayDatos = computed(() => props.porEmpresa.length > 0);
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-200 [&_td]:whitespace-nowrap [&_td]:tabular-nums">
-                            <tr v-for="(e, i) in porEmpresa" :key="i" class="hover:bg-gray-50">
+                            <tr v-for="(e, i) in mostradas" :key="i" class="hover:bg-gray-50">
                                 <td class="px-3 py-3 font-medium text-gray-900">{{ e.empresa }}</td>
+                                <td class="px-3 py-3 text-gray-600">{{ e.ruc || '—' }}</td>
                                 <td class="px-3 py-3 text-center">{{ e.cantidad_empleados }}</td>
                                 <td class="px-3 py-3 text-right">{{ money(e.total_ingresos) }}</td>
                                 <td class="px-3 py-3 text-right text-red-600">{{ money(e.total_descuentos) }}</td>
@@ -98,11 +135,12 @@ const hayDatos = computed(() => props.porEmpresa.length > 0);
                                 <td class="px-3 py-3 text-right text-blue-700">{{ money(e.total_aportes_empleador) }}</td>
                                 <td class="px-3 py-3 text-right font-bold text-indigo-700">{{ money(e.costo_total) }}</td>
                             </tr>
-                            <tr v-if="!hayDatos"><td colspan="11" class="px-4 py-6 text-center text-gray-500">No hay planillas generadas en este periodo.</td></tr>
+                            <tr v-if="!hayDatos"><td colspan="12" class="px-4 py-6 text-center text-gray-500">No hay planillas generadas en este periodo.</td></tr>
                         </tbody>
-                        <tfoot v-if="hayDatos" class="bg-gray-100 font-bold [&_td]:whitespace-nowrap [&_td]:tabular-nums">
+                        <tfoot v-if="hayDatos && empresaActiva === 'todas'" class="bg-gray-100 font-bold [&_td]:whitespace-nowrap [&_td]:tabular-nums">
                             <tr>
                                 <td class="px-3 py-3">TOTAL GENERAL</td>
+                                <td class="px-3 py-3"></td>
                                 <td class="px-3 py-3 text-center">{{ totalGeneral.cantidad_empleados }}</td>
                                 <td class="px-3 py-3 text-right">{{ money(totalGeneral.total_ingresos) }}</td>
                                 <td class="px-3 py-3 text-right text-red-700">{{ money(totalGeneral.total_descuentos) }}</td>

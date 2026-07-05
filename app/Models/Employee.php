@@ -33,6 +33,27 @@ class Employee extends Model implements Auditable
         'activo' => 'boolean',
     ];
 
+    /** Nombres y apellidos SIEMPRE en MAYÚSCULA (evita mezclar mayúsculas/minúsculas). */
+    private static function mayus($v)
+    {
+        return $v !== null && $v !== '' ? mb_strtoupper(trim($v), 'UTF-8') : $v;
+    }
+
+    public function setApellidoPaternoAttribute($v): void
+    {
+        $this->attributes['apellido_paterno'] = self::mayus($v);
+    }
+
+    public function setApellidoMaternoAttribute($v): void
+    {
+        $this->attributes['apellido_materno'] = self::mayus($v);
+    }
+
+    public function setNombresAttribute($v): void
+    {
+        $this->attributes['nombres'] = self::mayus($v);
+    }
+
     public function getNombreCompletoAttribute(): string
     {
         return trim("{$this->apellido_paterno} {$this->apellido_materno} {$this->nombres}");

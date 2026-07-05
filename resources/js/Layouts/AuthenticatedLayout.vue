@@ -45,6 +45,7 @@ const menu = computed(() => [
             { label: 'Adelantos / Préstamos', icon: '💸', route: 'adelantos.index', active: 'adelantos.*', show: can('planilla.ver') },
             { label: 'Consolidado', icon: '📊', route: 'reportes.consolidado', active: 'reportes.consolidado', show: can('reportes.ver') },
             { label: 'Tributos SUNAT', icon: '🏛️', route: 'reportes.tributos', active: 'reportes.tributos', show: can('reportes.ver') },
+            { label: 'Retenciones 5ta', icon: '🧾', route: 'reportes.retenciones', active: 'reportes.retenciones', show: can('reportes.ver') },
         ],
     },
     {

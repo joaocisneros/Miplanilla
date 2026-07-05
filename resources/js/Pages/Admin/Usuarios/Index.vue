@@ -193,7 +193,7 @@ const inp = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm';
 
         <CrudModal :show="mostrar" max-width="3xl" :titulo="editandoId ? 'Editar usuario' : 'Nuevo usuario'" @close="mostrar = false">
             <form @submit.prevent="guardar" class="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
-                <div><label class="text-sm font-medium text-gray-700">Nombre</label><input v-model="form.name" :class="inp" /><p v-if="form.errors.name" class="text-xs text-red-600">{{ form.errors.name }}</p></div>
+                <div><label class="text-sm font-medium text-gray-700">Nombre</label><input v-model="form.name" :class="inp" class="uppercase placeholder:normal-case" /><p v-if="form.errors.name" class="text-xs text-red-600">{{ form.errors.name }}</p></div>
                 <div><label class="text-sm font-medium text-gray-700">Correo</label><input v-model="form.email" type="email" :class="inp" /><p v-if="form.errors.email" class="text-xs text-red-600">{{ form.errors.email }}</p></div>
                 <div>
                     <label class="text-sm font-medium text-gray-700">Contraseña <span v-if="editandoId" class="text-xs font-normal text-gray-400">(en blanco = no cambiar)</span></label>

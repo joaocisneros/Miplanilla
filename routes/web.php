@@ -77,6 +77,7 @@ Route::middleware('auth')->group(function () {
     // Planilla
     Route::get('planilla', [PlanillaController::class, 'index'])->middleware('permission:planilla.ver')->name('planilla.index');
     Route::get('planilla/{payroll}', [PlanillaController::class, 'show'])->middleware('permission:planilla.ver')->name('planilla.show');
+    Route::get('planilla/{payroll}/detalle-excel', [PlanillaController::class, 'exportDetalle'])->middleware('permission:planilla.ver')->name('planilla.detalle-excel');
     Route::middleware('permission:planilla.generar')->group(function () {
         Route::post('planilla/periodos', [PlanillaController::class, 'storePeriodo'])->name('planilla.periodos.store');
         Route::post('planilla/generar-todas', [PlanillaController::class, 'generarTodas'])->name('planilla.generar-todas');
@@ -121,6 +122,8 @@ Route::middleware('auth')->group(function () {
     Route::get('reportes/consolidado', [ReporteController::class, 'consolidado'])->middleware('permission:reportes.ver')->name('reportes.consolidado');
     Route::get('reportes/consolidado/export', [ReporteController::class, 'consolidadoExport'])->middleware('permission:reportes.ver')->name('reportes.consolidado.export');
     Route::get('reportes/tributos', [ReporteController::class, 'tributos'])->middleware('permission:reportes.ver')->name('reportes.tributos');
+    Route::get('reportes/retenciones', [ReporteController::class, 'retenciones'])->middleware('permission:reportes.ver')->name('reportes.retenciones');
+    Route::get('reportes/retenciones/export', [ReporteController::class, 'retencionesExport'])->middleware('permission:reportes.ver')->name('reportes.retenciones.export');
     Route::get('reportes/plame', [ReporteController::class, 'plame'])->middleware('permission:reportes.ver')->name('reportes.plame');
 });
 

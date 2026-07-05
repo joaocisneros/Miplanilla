@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\PlanillaDetalleExport;
 use App\Exports\PlantillaExport;
 use App\Models\Empresa;
 use App\Models\Payroll;
@@ -35,21 +36,33 @@ class ReporteController extends Controller
     {
         $anio = (int) $request->input('anio', now()->year);
         $mes = (int) $request->input('mes', now()->month);
+        $empresa = trim((string) $request->input('empresa', ''));
         [$porEmpresa, $totalGeneral] = $this->datosConsolidado($anio, $mes);
 
-        $headings = ['Empresa', 'Empleados', 'Ingresos', 'Descuentos', 'Neto a pagar',
+        // Si se pide una empresa concreta (pestaña activa), exporta solo esa.
+        if ($empresa !== '') {
+            $porEmpresa = $porEmpresa->filter(fn ($e) => $e['empresa'] === $empresa)->values();
+        }
+
+        $headings = ['Empresa', 'RUC', 'Empleados', 'Ingresos', 'Descuentos', 'Neto a pagar',
             'EsSalud', 'SCTR', 'Vida Ley', 'SENATI', 'Aportes empleador', 'COSTO TOTAL'];
         $rows = $porEmpresa->map(fn ($e) => [
-            $e['empresa'], $e['cantidad_empleados'], $e['total_ingresos'], $e['total_descuentos'],
+            $e['empresa'], $e['ruc'], $e['cantidad_empleados'], $e['total_ingresos'], $e['total_descuentos'],
             $e['total_neto'], $e['essalud'], $e['sctr'], $e['vida_ley'], $e['senati'],
             $e['total_aportes_empleador'], $e['costo_total'],
         ])->values()->all();
-        $rows[] = ['TOTAL GENERAL', $totalGeneral['cantidad_empleados'], $totalGeneral['total_ingresos'],
-            $totalGeneral['total_descuentos'], $totalGeneral['total_neto'], $totalGeneral['essalud'],
-            $totalGeneral['sctr'], $totalGeneral['vida_ley'], $totalGeneral['senati'],
-            $totalGeneral['total_aportes_empleador'], $totalGeneral['costo_total']];
 
-        return Excel::download(new PlantillaExport($headings, $rows), "consolidado_{$anio}_{$mes}.xlsx");
+        // El TOTAL GENERAL solo cuando se exportan todas las empresas.
+        if ($empresa === '') {
+            $rows[] = ['TOTAL GENERAL', '', $totalGeneral['cantidad_empleados'], $totalGeneral['total_ingresos'],
+                $totalGeneral['total_descuentos'], $totalGeneral['total_neto'], $totalGeneral['essalud'],
+                $totalGeneral['sctr'], $totalGeneral['vida_ley'], $totalGeneral['senati'],
+                $totalGeneral['total_aportes_empleador'], $totalGeneral['costo_total']];
+        }
+
+        $nombre = $empresa !== '' ? 'consolidado_'.\Illuminate\Support\Str::slug($empresa)."_{$anio}_{$mes}.xlsx" : "consolidado_{$anio}_{$mes}.xlsx";
+
+        return Excel::download(new PlantillaExport($headings, $rows), $nombre);
     }
 
     /**
@@ -60,7 +73,7 @@ class ReporteController extends Controller
      */
     private function datosConsolidado(int $anio, int $mes): array
     {
-        $payrolls = Payroll::with(['empresa:id,razon_social', 'periodo', 'detalles'])
+        $payrolls = Payroll::with(['empresa:id,razon_social,ruc', 'periodo', 'detalles'])
             ->whereHas('periodo', fn ($q) => $q->where('anio', $anio)->where('mes', $mes))
             ->get();
 
@@ -78,6 +91,7 @@ class ReporteController extends Controller
 
             return [
                 'empresa' => $emp->razon_social,
+                'ruc' => $emp->ruc,
                 // Trabajadores ÚNICOS (un trabajador cuenta una vez, no por quincena).
                 'cantidad_empleados' => $det->pluck('employee_id')->unique()->count(),
                 'total_ingresos' => $ingresos,
@@ -146,6 +160,103 @@ class ReporteController extends Controller
             'totalGeneral' => $totalGeneral,
             'filtros' => ['anio' => $anio, 'mes' => $mes],
         ]);
+    }
+
+    /**
+     * Reporte de Retenciones de 5ta categoría (renta): tabla persona × mes,
+     * para ver cuánto se le retiene a cada trabajador a lo largo del año.
+     */
+    public function retenciones(Request $request): Response
+    {
+        $anio = (int) $request->input('anio', now()->year);
+        $empresaId = $request->input('empresa_id') ?: null;
+        [$filas, $totalesMes, $totalAnio] = $this->datosRetenciones($anio, $empresaId);
+
+        return Inertia::render('Reportes/Retenciones', [
+            'filas' => $filas,
+            'totalesMes' => $totalesMes,
+            'totalAnio' => $totalAnio,
+            'filtros' => ['anio' => $anio, 'empresa_id' => $empresaId],
+            'empresas' => Empresa::where('activo', true)->orderBy('razon_social')->get(['id', 'razon_social', 'nombre_comercial']),
+        ]);
+    }
+
+    /** Exporta las retenciones de 5ta (persona × mes) a Excel. */
+    public function retencionesExport(Request $request)
+    {
+        $anio = (int) $request->input('anio', now()->year);
+        $empresaId = $request->input('empresa_id') ?: null;
+        [$filas, $totalesMes, $totalAnio] = $this->datosRetenciones($anio, $empresaId);
+
+        $meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Set', 'Oct', 'Nov', 'Dic'];
+        $headings = array_merge(['DNI', 'Apellidos y Nombres', 'Empresa'], $meses, ['TOTAL AÑO']);
+        $rows = $filas->map(function ($f) {
+            $r = [$f['dni'], $f['nombre'], $f['empresa']];
+            for ($m = 1; $m <= 12; $m++) {
+                $r[] = $f['meses'][$m];
+            }
+            $r[] = $f['total'];
+            return $r;
+        })->all();
+
+        // Meses (4-15) y TOTAL (16) como dinero; TOTAL resaltado. Solo 3 columnas
+        // de identificación (DNI, Nombre, Empresa) → inmovilizar en D2.
+        $moneyCols = range(4, 16);
+
+        return Excel::download(new PlanillaDetalleExport($headings, $rows, $moneyCols, 16, 'D2'), "retenciones_5ta_{$anio}.xlsx");
+    }
+
+    /** Arma la matriz persona × mes de la renta de 5ta del año. */
+    private function datosRetenciones(int $anio, ?int $empresaId): array
+    {
+        $payrolls = Payroll::with([
+            'detalles:id,payroll_id,employee_id,renta_5ta',
+            'detalles.employee:id,numero_documento,apellido_paterno,apellido_materno,nombres',
+            'periodo:id,mes',
+            'empresa:id,razon_social',
+        ])->whereHas('periodo', fn ($q) => $q->where('anio', $anio))
+            ->when($empresaId, fn ($q) => $q->where('empresa_id', $empresaId))
+            ->get();
+
+        $trab = [];
+        $totalesMes = array_fill(1, 12, 0.0);
+        foreach ($payrolls as $p) {
+            $mes = (int) $p->periodo->mes;
+            foreach ($p->detalles as $d) {
+                $e = $d->employee;
+                if (! $e) {
+                    continue;
+                }
+                $trab[$e->id] ??= [
+                    'dni' => (string) $e->numero_documento,
+                    'nombre' => $e->nombre_completo,
+                    'empresa' => $p->empresa->razon_social,
+                    'meses' => array_fill(1, 12, 0.0),
+                    'total' => 0.0,
+                ];
+                $r = (float) $d->renta_5ta;
+                $trab[$e->id]['meses'][$mes] += $r;
+                $trab[$e->id]['total'] += $r;
+                $totalesMes[$mes] += $r;
+            }
+        }
+
+        foreach ($trab as &$t) {
+            foreach ($t['meses'] as $m => $v) {
+                $t['meses'][$m] = round($v, 2);
+            }
+            $t['total'] = round($t['total'], 2);
+        }
+        unset($t);
+
+        // Primero los que SÍ pagan (mayor total arriba), luego los de 0 por nombre.
+        $filas = collect($trab)->sort(function ($a, $b) {
+            return ($b['total'] <=> $a['total']) ?: strcmp($a['nombre'], $b['nombre']);
+        })->values();
+        $totalesMes = array_map(fn ($v) => round($v, 2), $totalesMes);
+        $totalAnio = round(array_sum($totalesMes), 2);
+
+        return [$filas, $totalesMes, $totalAnio];
     }
 
     /** Agrega los detalles de una empresa en los buckets de tributos/aportes. */

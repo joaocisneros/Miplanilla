@@ -53,6 +53,18 @@ class User extends Authenticatable
         ];
     }
 
+    /** El nombre del usuario se guarda SIEMPRE en MAYÚSCULA (uniforme con empleados). */
+    public function setNameAttribute($v): void
+    {
+        $this->attributes['name'] = $v !== null && $v !== '' ? mb_strtoupper(trim($v), 'UTF-8') : $v;
+    }
+
+    /** El correo SIEMPRE en minúscula (evita fallos de login en PostgreSQL, que distingue mayúsculas). */
+    public function setEmailAttribute($v): void
+    {
+        $this->attributes['email'] = $v !== null ? mb_strtolower(trim($v), 'UTF-8') : $v;
+    }
+
     /** Empleado vinculado a esta cuenta (si el usuario es un trabajador). */
     public function empleado()
     {

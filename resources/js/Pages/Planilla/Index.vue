@@ -109,6 +109,7 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                                 <td class="px-4 py-3">
                                     <div class="flex items-center justify-end gap-2">
                                         <Link v-if="p.payroll" :href="route('planilla.show', p.payroll.id)" class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100">👁 Ver</Link>
+                                        <a v-if="p.payroll" :href="route('planilla.detalle-excel', p.payroll.id)" class="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100" title="Descargar planilla detallada en Excel">📥 Excel</a>
                                         <button v-if="puedeGenerar && p.estado !== 'cerrado'" @click="generar(p)" class="inline-flex items-center gap-1 rounded-md bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100">{{ p.payroll ? '↻ Recalcular' : '⚙ Generar' }}</button>
                                         <button v-if="puedeCerrar && p.payroll && p.estado !== 'cerrado'" @click="cerrar(p.payroll.id, p.descripcion)" class="inline-flex items-center gap-1 rounded-md bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100">🔒 Cerrar</button>
                                         <span v-if="p.estado === 'cerrado'" class="text-xs text-gray-400">Cerrado</span>
