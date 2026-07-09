@@ -123,14 +123,30 @@ const inp = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm';
                 <div class="md:col-span-3"><label class="text-sm font-semibold text-gray-700">Empresa *</label><select v-model="form.empresa_id" :class="inp"><option value="">— Selecciona empresa —</option><option v-for="em in empresas" :key="em.id" :value="em.id">{{ em.nombre_comercial || em.razon_social }}</option></select><p v-if="form.errors.empresa_id" class="text-xs text-red-600">{{ form.errors.empresa_id }}</p></div>
                 <div class="md:col-span-3">
                     <label class="text-sm font-semibold text-gray-700">Modalidad *</label>
-                    <div class="mt-1 flex flex-wrap gap-3">
-                        <label :class="form.modalidad === 'planilla' ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200'" class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border px-4 py-3 text-sm transition hover:bg-gray-50">
-                            <input type="radio" value="planilla" v-model="form.modalidad" class="text-indigo-600 focus:ring-indigo-500" />
-                            <span><b>👷 Planilla</b> — empleado (sueldo, AFP/ONP, EsSalud, beneficios)</span>
+                    <div class="mt-1.5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <label
+                            :class="form.modalidad === 'planilla' ? 'border-indigo-400 bg-indigo-50/70 shadow-sm ring-1 ring-indigo-200' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'"
+                            class="relative flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition"
+                        >
+                            <input type="radio" value="planilla" v-model="form.modalidad" class="sr-only" />
+                            <span :class="form.modalidad === 'planilla' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500'" class="grid h-10 w-10 flex-none place-items-center rounded-full text-lg transition">👷</span>
+                            <span class="min-w-0">
+                                <span class="block text-sm font-semibold text-gray-900">Planilla</span>
+                                <span class="mt-0.5 block text-xs text-gray-500">Sueldo, AFP/ONP, EsSalud, beneficios</span>
+                            </span>
+                            <svg v-if="form.modalidad === 'planilla'" class="absolute right-3 top-3 h-5 w-5 flex-none text-indigo-600" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>
                         </label>
-                        <label :class="form.modalidad === 'honorarios' ? 'border-emerald-400 bg-emerald-50' : 'border-gray-200'" class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border px-4 py-3 text-sm transition hover:bg-gray-50">
-                            <input type="radio" value="honorarios" v-model="form.modalidad" class="text-emerald-600 focus:ring-emerald-500" />
-                            <span><b>🧾 Recibos por Honorarios</b> — sueldo neto (sin descuentos ni aportes)</span>
+                        <label
+                            :class="form.modalidad === 'honorarios' ? 'border-emerald-400 bg-emerald-50/70 shadow-sm ring-1 ring-emerald-200' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'"
+                            class="relative flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition"
+                        >
+                            <input type="radio" value="honorarios" v-model="form.modalidad" class="sr-only" />
+                            <span :class="form.modalidad === 'honorarios' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'" class="grid h-10 w-10 flex-none place-items-center rounded-full text-lg transition">🧾</span>
+                            <span class="min-w-0">
+                                <span class="block text-sm font-semibold text-gray-900">Recibos por Honorarios</span>
+                                <span class="mt-0.5 block text-xs text-gray-500">Sueldo neto, sin descuentos ni aportes</span>
+                            </span>
+                            <svg v-if="form.modalidad === 'honorarios'" class="absolute right-3 top-3 h-5 w-5 flex-none text-emerald-600" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>
                         </label>
                     </div>
                     <div v-if="esHonorarios" class="mt-2 rounded-md bg-emerald-50 px-3 py-2 text-xs text-emerald-800">

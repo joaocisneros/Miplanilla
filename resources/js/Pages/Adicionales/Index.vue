@@ -1,7 +1,7 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, router, useForm } from '@inertiajs/vue3';
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 
 const props = defineProps({
     empresas: { type: Array, default: () => [] },
@@ -32,6 +32,12 @@ const form = useForm({
     mes: props.filtros.mes ?? new Date().getMonth() + 1,
     quincena: props.filtros.quincena ?? '',
     filas: props.filas.map((x) => ({ ...x })),
+});
+
+// El form se arma UNA vez al montar; si no, al "Cargar" (misma pantalla, sin
+// remontar) la tabla se queda con los datos viejos. Se resincroniza aquí.
+watch(() => props.filas, (nuevasFilas) => {
+    form.filas = nuevasFilas.map((x) => ({ ...x }));
 });
 
 function guardar() {
@@ -126,8 +132,8 @@ const inp = 'w-full rounded-md border-gray-300 shadow-sm text-sm text-right';
                                 <input v-model="r.aprobado" type="checkbox" class="h-5 w-5 rounded border-gray-300 text-green-600" />
                             </td>
                             <td class="px-3 py-2 w-28"><input v-model="r.monto_horas" type="number" step="0.01" min="0" :class="[inp, !r.aprobado ? 'bg-gray-100 text-gray-400' : '']" /></td>
-                            <td class="px-3 py-2 w-24"><input v-model="r.sabado" type="number" step="0.01" min="0" :class="inp" /></td>
-                            <td class="px-3 py-2 w-24"><input v-model="r.domingo_feriado" type="number" step="0.01" min="0" :class="inp" /></td>
+                            <td class="px-3 py-2 w-28"><input v-model="r.sabado" type="number" step="0.01" min="0" :class="inp" /></td>
+                            <td class="px-3 py-2 w-28"><input v-model="r.domingo_feriado" type="number" step="0.01" min="0" :class="inp" /></td>
                             <td class="px-3 py-2 w-28"><input v-model="r.bono" type="number" step="0.01" min="0" :class="inp" /></td>
                             <td class="px-3 py-2"><input v-model="r.nota" type="text" maxlength="255" class="w-full rounded-md border-gray-300 text-sm" /></td>
                         </tr>

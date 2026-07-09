@@ -45,10 +45,19 @@ class RolePermissionSeeder extends Seeder
                 'asistencia.ver', 'asistencia.validar', 'asistencia.justificar',
                 'empleados.ver', 'reportes.ver',
             ],
-            // Contador / auditor externo: SOLO LECTURA de su(s) empresa(s).
+            // Auditor externo (SUNAT/SUNAFIL, revisor puntual): solo lectura general.
             'AUDITOR' => [
                 'empleados.ver', 'asistencia.ver', 'planilla.ver',
                 'boletas.ver', 'reportes.ver',
+            ],
+            // Contador: SOLO LECTURA de lo que necesita para declarar (Planilla,
+            // Honorarios, Gratificaciones, CTS, Vacaciones, Boletas, Reportes SUNAT).
+            // NO ve Empleados (datos personales) ni Asistencia diaria (operativo).
+            // Sí puede VER y EDITAR Parámetros/Tasas AFP/Pólizas Vida Ley (config.*):
+            // suele ser quien actualiza esas tasas legales cada año.
+            'CONTADOR' => [
+                'planilla.ver', 'boletas.ver', 'reportes.ver',
+                'config.ver', 'config.editar',
             ],
             'EMPLEADO' => [
                 'asistencia.ver', 'boletas.ver',

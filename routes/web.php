@@ -161,16 +161,6 @@ Route::middleware(['auth', 'role:ADMIN'])->prefix('admin')->name('admin.')->grou
     Route::put('sedes/{sede}', [SedeController::class, 'update'])->name('sedes.update');
     Route::delete('sedes/{sede}', [SedeController::class, 'destroy'])->name('sedes.destroy');
 
-    // Maestros (configuración de reglas)
-    Route::get('parametros', [ParametroPeriodoController::class, 'index'])->name('parametros.index');
-    Route::post('parametros', [ParametroPeriodoController::class, 'store'])->name('parametros.store');
-    Route::put('parametros/{parametro}', [ParametroPeriodoController::class, 'update'])->name('parametros.update');
-
-    Route::get('tasas-afp', [TasaAfpController::class, 'index'])->name('tasas-afp.index');
-    Route::post('tasas-afp', [TasaAfpController::class, 'store'])->name('tasas-afp.store');
-    Route::put('tasas-afp/{tasa}', [TasaAfpController::class, 'update'])->name('tasas-afp.update');
-    Route::delete('tasas-afp/{tasa}', [TasaAfpController::class, 'destroy'])->name('tasas-afp.destroy');
-
     Route::get('conceptos', [ConceptoController::class, 'index'])->name('conceptos.index');
     Route::put('conceptos/{concepto}', [ConceptoController::class, 'update'])->name('conceptos.update');
 
@@ -179,12 +169,6 @@ Route::middleware(['auth', 'role:ADMIN'])->prefix('admin')->name('admin.')->grou
     Route::post('polizas-sctr', [PolizaSctrController::class, 'store'])->name('polizas-sctr.store');
     Route::put('polizas-sctr/{poliza}', [PolizaSctrController::class, 'update'])->name('polizas-sctr.update');
     Route::delete('polizas-sctr/{poliza}', [PolizaSctrController::class, 'destroy'])->name('polizas-sctr.destroy');
-
-    // Pólizas Vida Ley
-    Route::get('polizas-vida-ley', [PolizaVidaLeyController::class, 'index'])->name('polizas-vida-ley.index');
-    Route::post('polizas-vida-ley', [PolizaVidaLeyController::class, 'store'])->name('polizas-vida-ley.store');
-    Route::put('polizas-vida-ley/{poliza}', [PolizaVidaLeyController::class, 'update'])->name('polizas-vida-ley.update');
-    Route::delete('polizas-vida-ley/{poliza}', [PolizaVidaLeyController::class, 'destroy'])->name('polizas-vida-ley.destroy');
 
     // Catálogos por empresa/globales
     Route::get('areas', [AreaController::class, 'index'])->name('areas.index');
@@ -201,6 +185,29 @@ Route::middleware(['auth', 'role:ADMIN'])->prefix('admin')->name('admin.')->grou
     Route::post('turnos', [TurnoController::class, 'store'])->name('turnos.store');
     Route::put('turnos/{turno}', [TurnoController::class, 'update'])->name('turnos.update');
     Route::delete('turnos/{turno}', [TurnoController::class, 'destroy'])->name('turnos.destroy');
+});
+
+// Parámetros legales, Tasas AFP y Pólizas Vida Ley: ADMIN y CONTADOR (el contador
+// suele ser quien actualiza estas tasas cada año). El resto del panel Admin (Empresas,
+// Usuarios, Sedes, Conceptos, Pólizas SCTR, etc.) sigue exclusivo de ADMIN arriba.
+Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
+    Route::middleware('permission:config.ver')->group(function () {
+        Route::get('parametros', [ParametroPeriodoController::class, 'index'])->name('parametros.index');
+        Route::get('tasas-afp', [TasaAfpController::class, 'index'])->name('tasas-afp.index');
+        Route::get('polizas-vida-ley', [PolizaVidaLeyController::class, 'index'])->name('polizas-vida-ley.index');
+    });
+    Route::middleware('permission:config.editar')->group(function () {
+        Route::post('parametros', [ParametroPeriodoController::class, 'store'])->name('parametros.store');
+        Route::put('parametros/{parametro}', [ParametroPeriodoController::class, 'update'])->name('parametros.update');
+
+        Route::post('tasas-afp', [TasaAfpController::class, 'store'])->name('tasas-afp.store');
+        Route::put('tasas-afp/{tasa}', [TasaAfpController::class, 'update'])->name('tasas-afp.update');
+        Route::delete('tasas-afp/{tasa}', [TasaAfpController::class, 'destroy'])->name('tasas-afp.destroy');
+
+        Route::post('polizas-vida-ley', [PolizaVidaLeyController::class, 'store'])->name('polizas-vida-ley.store');
+        Route::put('polizas-vida-ley/{poliza}', [PolizaVidaLeyController::class, 'update'])->name('polizas-vida-ley.update');
+        Route::delete('polizas-vida-ley/{poliza}', [PolizaVidaLeyController::class, 'destroy'])->name('polizas-vida-ley.destroy');
+    });
 });
 
 require __DIR__.'/auth.php';

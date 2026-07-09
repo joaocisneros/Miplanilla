@@ -33,35 +33,65 @@ const menu = computed(() => [
         items: [
             { label: 'Dashboard', icon: '🏠', route: 'dashboard', active: 'dashboard', show: true },
             { label: 'Empleados', icon: '👥', route: 'empleados.index', active: 'empleados.*', show: can('empleados.ver') },
+        ],
+    },
+    {
+        titulo: 'Asistencia',
+        items: [
             { label: 'Asistencia diaria', icon: '🕒', route: 'asistencia.diario', active: 'asistencia.diario', show: can('asistencia.ver') },
             { label: 'Resumen mensual', icon: '📋', route: 'asistencia.resumen', active: 'asistencia.resumen', show: can('asistencia.ver') },
             { label: 'Historial asistencia', icon: '📅', route: 'asistencia.index', active: 'asistencia.index', show: can('asistencia.ver') },
+        ],
+    },
+    {
+        titulo: 'Planilla',
+        items: [
             { label: 'Planilla', icon: '💰', route: 'planilla.index', active: 'planilla.*', show: can('planilla.ver') },
             { label: 'Honorarios (RxH)', icon: '🧾', route: 'honorarios.index', active: 'honorarios.*', show: can('planilla.ver') },
+            { label: 'Horas extra y bonos', icon: '⏱️', route: 'adicionales.index', active: 'adicionales.*', show: can('planilla.ver') },
+            { label: 'Adelantos / Préstamos', icon: '💸', route: 'adelantos.index', active: 'adelantos.*', show: can('planilla.ver') },
+        ],
+    },
+    {
+        titulo: 'Beneficios',
+        items: [
             { label: 'Gratificaciones', icon: '🎁', route: 'gratificaciones.index', active: 'gratificaciones.*', show: can('planilla.ver') },
             { label: 'CTS', icon: '🏦', route: 'cts.index', active: 'cts.*', show: can('planilla.ver') },
             { label: 'Vacaciones', icon: '🌴', route: 'vacaciones.index', active: 'vacaciones.*', show: can('planilla.ver') },
             { label: 'Liquidación', icon: '🧾', route: 'liquidacion.index', active: 'liquidacion.*', show: can('planilla.ver') },
-            { label: 'Horas extra y bonos', icon: '⏱️', route: 'adicionales.index', active: 'adicionales.*', show: can('planilla.ver') },
-            { label: 'Adelantos / Préstamos', icon: '💸', route: 'adelantos.index', active: 'adelantos.*', show: can('planilla.ver') },
+        ],
+    },
+    {
+        titulo: 'Reportes',
+        items: [
             { label: 'Consolidado', icon: '📊', route: 'reportes.consolidado', active: 'reportes.consolidado', show: can('reportes.ver') },
             { label: 'Tributos SUNAT', icon: '🏛️', route: 'reportes.tributos', active: 'reportes.tributos', show: can('reportes.ver') },
             { label: 'Retenciones 5ta', icon: '🧾', route: 'reportes.retenciones', active: 'reportes.retenciones', show: can('reportes.ver') },
         ],
     },
     {
-        titulo: 'Configuración',
+        titulo: 'Empresa',
         items: [
             { label: 'Empresas', icon: '🏢', route: 'admin.empresas.index', active: 'admin.empresas.*', show: esAdmin.value },
             { label: 'Sedes', icon: '📍', route: 'admin.sedes.index', active: 'admin.sedes.*', show: false }, // oculto: 1 sola sede por empresa; sigue activo por detrás
             { label: 'Áreas', icon: '🗂️', route: 'admin.areas.index', active: 'admin.areas.*', show: esAdmin.value },
             { label: 'Cargos', icon: '🏷️', route: 'admin.cargos.index', active: 'admin.cargos.*', show: esAdmin.value },
             { label: 'Turnos', icon: '⏰', route: 'admin.turnos.index', active: 'admin.turnos.*', show: esAdmin.value },
-            { label: 'Parámetros', icon: '⚙️', route: 'admin.parametros.index', active: 'admin.parametros.*', show: esAdmin.value },
-            { label: 'Tasas AFP', icon: '📈', route: 'admin.tasas-afp.index', active: 'admin.tasas-afp.*', show: esAdmin.value },
+        ],
+    },
+    {
+        titulo: 'Tasas y pólizas',
+        items: [
+            { label: 'Parámetros', icon: '⚙️', route: 'admin.parametros.index', active: 'admin.parametros.*', show: esAdmin.value || can('config.ver') },
+            { label: 'Tasas AFP', icon: '📈', route: 'admin.tasas-afp.index', active: 'admin.tasas-afp.*', show: esAdmin.value || can('config.ver') },
             { label: 'Pólizas SCTR', icon: '🛡️', route: 'admin.polizas-sctr.index', active: 'admin.polizas-sctr.*', show: esAdmin.value },
-            { label: 'Pólizas Vida Ley', icon: '🪪', route: 'admin.polizas-vida-ley.index', active: 'admin.polizas-vida-ley.*', show: esAdmin.value },
+            { label: 'Pólizas Vida Ley', icon: '🪪', route: 'admin.polizas-vida-ley.index', active: 'admin.polizas-vida-ley.*', show: esAdmin.value || can('config.ver') },
             { label: 'Conceptos', icon: '🧮', route: 'admin.conceptos.index', active: 'admin.conceptos.*', show: esAdmin.value },
+        ],
+    },
+    {
+        titulo: 'Sistema',
+        items: [
             { label: 'Usuarios', icon: '👤', route: 'admin.usuarios.index', active: 'admin.usuarios.*', show: esAdmin.value },
             { label: 'Bitácora', icon: '📖', route: 'admin.auditoria.index', active: 'admin.auditoria.*', show: esAdmin.value },
         ],
