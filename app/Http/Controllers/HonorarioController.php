@@ -128,6 +128,21 @@ class HonorarioController extends Controller
         return back()->with('success', "Honorarios generados/recalculados en {$generadas} empresa(s).");
     }
 
+    /**
+     * Recalcula una planilla (payroll) puntual desde la lista de Honorarios.
+     * Nota: recalcula TODO el periodo (planilla + honorarios), porque ambos
+     * viven en el mismo payroll; no existe un recálculo "solo honorarios".
+     */
+    public function recalcular(Request $request, Payroll $payroll, PlanillaService $service)
+    {
+        abort_if($payroll->estado === 'cerrado', 403, 'El periodo está cerrado.');
+
+        $service->generar($payroll->periodo, $request->user()->id);
+        $payroll->periodo->update(['estado' => 'calculado']);
+
+        return back()->with('success', 'Honorarios recalculados.');
+    }
+
     /** Exporta a Excel el detalle de honorarios de una planilla (payroll) concreta. */
     public function export(Payroll $payroll)
     {

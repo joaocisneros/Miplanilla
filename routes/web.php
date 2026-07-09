@@ -93,6 +93,7 @@ Route::middleware('auth')->group(function () {
     Route::get('honorarios/{payroll}', [\App\Http\Controllers\HonorarioController::class, 'show'])->middleware('permission:planilla.ver')->name('honorarios.show');
     Route::get('honorarios/{payroll}/excel', [\App\Http\Controllers\HonorarioController::class, 'export'])->middleware('permission:planilla.ver')->name('honorarios.excel');
     Route::get('honorarios/{payroll}/recibos-zip', [\App\Http\Controllers\HonorarioController::class, 'reciboZip'])->middleware('permission:boletas.ver')->name('honorarios.recibos-zip');
+    Route::post('honorarios/{payroll}/recalcular', [\App\Http\Controllers\HonorarioController::class, 'recalcular'])->middleware('permission:planilla.generar')->name('honorarios.recalcular');
 
     // Gratificaciones (Julio / Diciembre)
     Route::get('gratificaciones', [GratificacionController::class, 'index'])->middleware('permission:planilla.ver')->name('gratificaciones.index');

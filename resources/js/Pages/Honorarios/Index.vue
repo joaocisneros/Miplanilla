@@ -48,6 +48,12 @@ function generar() {
     });
 }
 
+function recalcular(p) {
+    if (confirm(`Recalcular "${p.descripcion}" de ${p.empresa}? Esto recalcula TODO el periodo (planilla + honorarios).`)) {
+        router.post(route('honorarios.recalcular', p.payroll_id), {}, { preserveScroll: true });
+    }
+}
+
 const money = (v) => 'S/ ' + Number(v ?? 0).toLocaleString('es-PE', { minimumFractionDigits: 2 });
 const inp = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm';
 const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
@@ -93,6 +99,8 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                                     <div class="flex items-center justify-end gap-2">
                                         <Link :href="route('honorarios.show', p.payroll_id)" class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100">👁 Ver</Link>
                                         <a :href="route('honorarios.excel', p.payroll_id)" class="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100" title="Descargar Excel">📥 Excel</a>
+                                        <button v-if="puedeGenerar && p.estado !== 'cerrado'" @click="recalcular(p)" class="inline-flex items-center gap-1 rounded-md bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100" title="Recalcula TODO el periodo (planilla + honorarios)">↻ Recalcular</button>
+                                        <span v-if="p.estado === 'cerrado'" class="text-xs text-gray-400">Cerrado</span>
                                     </div>
                                 </td>
                             </tr>
