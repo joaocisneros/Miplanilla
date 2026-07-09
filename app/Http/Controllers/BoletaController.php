@@ -11,17 +11,24 @@ class BoletaController extends Controller
 {
     public function pdf(Request $request, PayrollDetail $detalle)
     {
+        // Honorarios (RxH) tiene su propio "recibo" en el módulo Honorarios (sin
+        // pensión/renta/aportes); la boleta de planilla no le corresponde. Se usa la
+        // modalidad congelada en el detalle, no la actual del empleado.
+        abort_if(($detalle->modalidad ?? 'planilla') === 'honorarios', 404);
+
         $pdf = $this->generarPdf($detalle);
 
         return $pdf->download($this->nombreBoleta($detalle));
     }
 
-    /** Descarga TODAS las boletas de una planilla en un solo ZIP. */
+    /** Descarga TODAS las boletas de planilla (excluye honorarios) en un solo ZIP. */
     public function zip(Request $request, Payroll $payroll)
     {
         $payroll->load(['empresa:id,razon_social', 'periodo', 'detalles.employee']);
 
-        if ($payroll->detalles->isEmpty()) {
+        $detalles = $payroll->detalles->filter(fn ($d) => ($d->modalidad ?? 'planilla') !== 'honorarios');
+
+        if ($detalles->isEmpty()) {
             return back()->with('error', 'La planilla no tiene boletas para descargar.');
         }
 
@@ -29,7 +36,7 @@ class BoletaController extends Controller
         $zip = new \ZipArchive;
         $zip->open($tmp, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
 
-        foreach ($payroll->detalles as $detalle) {
+        foreach ($detalles as $detalle) {
             $pdf = $this->generarPdf($detalle);
             $zip->addFromString($this->nombreBoleta($detalle), $pdf->output());
         }

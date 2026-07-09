@@ -10,7 +10,7 @@ class PayrollDetail extends Model
     protected $table = 'payroll_details';
 
     protected $fillable = [
-        'payroll_id', 'employee_id',
+        'payroll_id', 'employee_id', 'modalidad',
         'base_afecta', 'total_ingresos', 'pension_total', 'renta_5ta',
         'total_descuentos', 'neto',
         'essalud', 'sctr_pension', 'sctr_salud', 'vida_ley', 'senati', 'desglose',

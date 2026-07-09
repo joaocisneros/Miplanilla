@@ -119,6 +119,14 @@ function eliminar(emp) {
         router.delete(route('empleados.destroy', emp.id), { preserveScroll: true });
     }
 }
+function cesar(emp) {
+    const msg = emp.activo
+        ? `¿Cesar a ${emp.nombre_completo}?\n\nYa no aparecerá en nuevas planillas, pero se conserva TODO su historial (boletas, contrato, ficha). Si vuelve, lo reactivas con un clic.`
+        : `¿Reactivar a ${emp.nombre_completo}? Volverá a aparecer en la planilla.`;
+    if (confirm(msg)) {
+        router.patch(route('empleados.estado', emp.id), {}, { preserveScroll: true });
+    }
+}
 const money = (v) => v != null ? 'S/ ' + Number(v).toLocaleString('es-PE', { minimumFractionDigits: 2 }) : '—';
 const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
 </script>
@@ -219,7 +227,8 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                                     <a :href="route('empleados.contrato', emp.id)" class="inline-flex items-center gap-1 rounded-md bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700 hover:bg-sky-100" title="Generar contrato PDF para imprimir y firmar">📄 Contrato</a>
                                     <button @click="abrirDocs(emp)" class="inline-flex items-center gap-1 rounded-md bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200" title="Documentos archivados">📎 Docs <span v-if="emp.documentos?.length" class="ml-0.5 rounded-full bg-gray-700 px-1.5 text-white">{{ emp.documentos.length }}</span></button>
                                     <button v-if="puedeGestionar" @click="abrirEditar(emp)" class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100">✎ Editar</button>
-                                    <button v-if="puedeGestionar" @click="eliminar(emp)" class="inline-flex items-center gap-1 rounded-md bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100">🗑</button>
+                                    <button v-if="puedeGestionar && emp.activo" @click="cesar(emp)" class="inline-flex items-center gap-1 rounded-md bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100" title="Cesar: deja de aparecer en la planilla, se conserva su historial">🚫 Cesar</button>
+                                    <button v-if="puedeGestionar && !emp.activo" @click="cesar(emp)" class="inline-flex items-center gap-1 rounded-md bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-100" title="Reactivar: vuelve a la planilla">✓ Activar</button>
                                 </div>
                             </td>
                         </tr>

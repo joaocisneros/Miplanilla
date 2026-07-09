@@ -37,6 +37,7 @@ const menu = computed(() => [
             { label: 'Resumen mensual', icon: '📋', route: 'asistencia.resumen', active: 'asistencia.resumen', show: can('asistencia.ver') },
             { label: 'Historial asistencia', icon: '📅', route: 'asistencia.index', active: 'asistencia.index', show: can('asistencia.ver') },
             { label: 'Planilla', icon: '💰', route: 'planilla.index', active: 'planilla.*', show: can('planilla.ver') },
+            { label: 'Honorarios (RxH)', icon: '🧾', route: 'honorarios.index', active: 'honorarios.*', show: can('planilla.ver') },
             { label: 'Gratificaciones', icon: '🎁', route: 'gratificaciones.index', active: 'gratificaciones.*', show: can('planilla.ver') },
             { label: 'CTS', icon: '🏦', route: 'cts.index', active: 'cts.*', show: can('planilla.ver') },
             { label: 'Vacaciones', icon: '🌴', route: 'vacaciones.index', active: 'vacaciones.*', show: can('planilla.ver') },

@@ -25,7 +25,7 @@ class Employee extends Model implements Auditable
         'tipo_vivienda', 'nivel_educativo',
         'banco', 'cuenta_corriente', 'cuenta_ahorros', 'cci',
         'emergencia_nombre', 'emergencia_telefono', 'emergencia_parentesco',
-        'codigo_biometrico', 'user_id', 'activo',
+        'codigo_biometrico', 'user_id', 'activo', 'modalidad',
     ];
 
     protected $casts = [

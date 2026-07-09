@@ -23,6 +23,8 @@ const c = props.contrato ?? {};
 
 const form = useForm({
     empresa_id: e.empresa_id ?? props.empresaIdInicial ?? '',
+    // Modalidad: 'planilla' (empleado 5ta) u 'honorarios' (RxH 4ta)
+    modalidad: e.modalidad ?? 'planilla',
     // Datos personales
     apellido_paterno: e.apellido_paterno ?? '',
     apellido_materno: e.apellido_materno ?? '',
@@ -71,6 +73,7 @@ const form = useForm({
     aporta_sctr: c.aporta_sctr ?? false,
     aporta_senati: c.aporta_senati ?? false,
     tiene_vida_ley: c.tiene_vida_ley ?? false,
+    retiene_4ta: c.retiene_4ta ?? true,
     area_id: c.area_id ?? '',
     cargo_id: c.cargo_id ?? '',
     turno_id: c.turno_id ?? '',
@@ -83,6 +86,7 @@ const form = useForm({
 });
 
 // Sede y área dependen de la empresa elegida
+const esHonorarios = computed(() => form.modalidad === 'honorarios');
 const tipoEsPlazoFijo = computed(() => props.tiposContrato.find((t) => t.value === form.tipo_contrato)?.plazo_fijo ?? false);
 const sedesFiltradas = computed(() => props.sedes.filter((s) => String(s.empresa_id) === String(form.empresa_id)));
 const areasFiltradas = computed(() => props.areas.filter((a) => String(a.empresa_id) === String(form.empresa_id)));
@@ -117,6 +121,22 @@ const inp = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm';
             <h3 class="mb-4 border-b pb-2 text-lg font-medium text-gray-900">1. Datos personales</h3>
             <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div class="md:col-span-3"><label class="text-sm font-semibold text-gray-700">Empresa *</label><select v-model="form.empresa_id" :class="inp"><option value="">— Selecciona empresa —</option><option v-for="em in empresas" :key="em.id" :value="em.id">{{ em.nombre_comercial || em.razon_social }}</option></select><p v-if="form.errors.empresa_id" class="text-xs text-red-600">{{ form.errors.empresa_id }}</p></div>
+                <div class="md:col-span-3">
+                    <label class="text-sm font-semibold text-gray-700">Modalidad *</label>
+                    <div class="mt-1 flex flex-wrap gap-3">
+                        <label :class="form.modalidad === 'planilla' ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200'" class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border px-4 py-3 text-sm transition hover:bg-gray-50">
+                            <input type="radio" value="planilla" v-model="form.modalidad" class="text-indigo-600 focus:ring-indigo-500" />
+                            <span><b>👷 Planilla</b> — empleado (sueldo, AFP/ONP, EsSalud, beneficios)</span>
+                        </label>
+                        <label :class="form.modalidad === 'honorarios' ? 'border-emerald-400 bg-emerald-50' : 'border-gray-200'" class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border px-4 py-3 text-sm transition hover:bg-gray-50">
+                            <input type="radio" value="honorarios" v-model="form.modalidad" class="text-emerald-600 focus:ring-emerald-500" />
+                            <span><b>🧾 Recibos por Honorarios</b> — sueldo neto (sin descuentos ni aportes)</span>
+                        </label>
+                    </div>
+                    <div v-if="esHonorarios" class="mt-2 rounded-md bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                        Va por <b>Recibos por Honorarios</b>: se paga <b>sueldo neto</b> (sin AFP/ONP, EsSalud, ni descuentos), sin gratificación/CTS/vacaciones. <b>Sí</b> se le aplican tardanzas, faltas, sábados y domingos/feriados. Llena su <b>honorario</b>, área y turno.
+                    </div>
+                </div>
                 <div><label class="text-sm text-gray-700">Apellido paterno *</label><input v-model="form.apellido_paterno" :class="[inp, 'uppercase placeholder:normal-case']" /><p v-if="form.errors.apellido_paterno" class="text-xs text-red-600">{{ form.errors.apellido_paterno }}</p></div>
                 <div><label class="text-sm text-gray-700">Apellido materno</label><input v-model="form.apellido_materno" :class="[inp, 'uppercase placeholder:normal-case']" /></div>
                 <div><label class="text-sm text-gray-700">Nombres *</label><input v-model="form.nombres" :class="[inp, 'uppercase placeholder:normal-case']" /><p v-if="form.errors.nombres" class="text-xs text-red-600">{{ form.errors.nombres }}</p></div>
@@ -179,18 +199,18 @@ const inp = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm';
                     <p class="text-xs text-amber-600">Requerida para contratos a plazo fijo.</p>
                     <p v-if="form.errors.fecha_cese" class="text-xs text-red-600">{{ form.errors.fecha_cese }}</p>
                 </div>
-                <div><label class="text-sm text-gray-700">Sueldo básico *</label><input v-model="form.sueldo_basico" type="number" step="0.01" :class="inp" /><p v-if="form.errors.sueldo_basico" class="text-xs text-red-600">{{ form.errors.sueldo_basico }}</p></div>
-                <div><label class="text-sm text-gray-700">Movilidad</label><input v-model="form.movilidad" type="number" step="0.01" :class="inp" /></div>
+                <div><label class="text-sm text-gray-700">{{ esHonorarios ? 'Honorario (mensual) *' : 'Sueldo básico *' }}</label><input v-model="form.sueldo_basico" type="number" step="0.01" :class="inp" /><p v-if="form.errors.sueldo_basico" class="text-xs text-red-600">{{ form.errors.sueldo_basico }}</p></div>
+                <div v-if="!esHonorarios"><label class="text-sm text-gray-700">Movilidad</label><input v-model="form.movilidad" type="number" step="0.01" :class="inp" /></div>
                 <div><label class="text-sm text-gray-700">Otros ingresos</label><input v-model="form.otros" type="number" step="0.01" :class="inp" /></div>
-                <div class="flex items-center gap-2 pt-6"><input v-model="form.percibe_asignacion_familiar" type="checkbox" id="af" class="rounded" /><label for="af" class="text-sm">Percibe asignación familiar</label></div>
+                <div v-if="!esHonorarios" class="flex items-center gap-2 pt-6"><input v-model="form.percibe_asignacion_familiar" type="checkbox" id="af" class="rounded" /><label for="af" class="text-sm">Percibe asignación familiar</label></div>
                 <div><label class="text-sm text-gray-700">Área</label><select v-model="form.area_id" :class="inp" :disabled="!form.empresa_id"><option value="">{{ form.empresa_id ? '—' : '↑ Elige la empresa primero' }}</option><option v-for="a in areasFiltradas" :key="a.id" :value="a.id">{{ a.nombre }}</option></select><p v-if="!form.empresa_id" class="text-xs text-amber-600">Selecciona la empresa (arriba) para ver sus áreas.</p></div>
                 <div><label class="text-sm text-gray-700">Cargo</label><select v-model="form.cargo_id" :class="inp"><option value="">—</option><option v-for="ca in cargos" :key="ca.id" :value="ca.id">{{ ca.nombre }}</option></select></div>
                 <div><label class="text-sm text-gray-700">Turno</label><select v-model="form.turno_id" :class="inp"><option value="">—</option><option v-for="t in turnos" :key="t.id" :value="t.id">{{ t.nombre }}</option></select></div>
             </div>
         </section>
 
-        <!-- Pensiones / seguros -->
-        <section class="bg-white p-6 shadow-sm sm:rounded-lg">
+        <!-- Pensiones / seguros (solo para PLANILLA; los honorarios no tienen) -->
+        <section v-if="!esHonorarios" class="bg-white p-6 shadow-sm sm:rounded-lg">
             <h3 class="mb-4 border-b pb-2 text-lg font-medium text-gray-900">5. Pensiones y seguros</h3>
             <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div><label class="text-sm text-gray-700">Sistema de pensiones</label><select v-model="form.sistema_pensiones" :class="inp"><option value="">—</option><option value="AFP">AFP</option><option value="ONP">ONP</option></select></div>
@@ -214,8 +234,8 @@ const inp = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm';
             </div>
         </section>
 
-        <!-- Derechohabientes -->
-        <section class="bg-white p-6 shadow-sm sm:rounded-lg">
+        <!-- Derechohabientes (solo para PLANILLA; los honorarios no tienen asig. familiar) -->
+        <section v-if="!esHonorarios" class="bg-white p-6 shadow-sm sm:rounded-lg">
             <div class="mb-4 flex items-center justify-between border-b pb-2">
                 <h3 class="text-lg font-medium text-gray-900">7. Hijos / cónyuge (derechohabientes)</h3>
                 <button type="button" @click="agregarDH" class="rounded bg-gray-200 px-3 py-1 text-sm font-medium hover:bg-gray-300">+ Agregar</button>

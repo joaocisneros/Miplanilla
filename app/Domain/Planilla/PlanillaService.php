@@ -64,15 +64,26 @@ class PlanillaService
 
                 $ag = $this->agregarAsistencia($emp->id, $periodo, $diasPeriodo);
 
-                $asigFam = $contrato->percibe_asignacion_familiar ? (float) ($param?->asignacion_familiar ?? 0) : 0;
+                // Modalidad: 'honorarios' (RxH, renta 4ta) o 'planilla' (empleado, renta 5ta).
+                $esHonorarios = ($emp->modalidad ?? 'planilla') === 'honorarios';
 
+                // Los honorarios NO perciben asignación familiar (no son planilla).
+                $asigFam = (! $esHonorarios && $contrato->percibe_asignacion_familiar)
+                    ? (float) ($param?->asignacion_familiar ?? 0) : 0;
+
+                $uit = (float) ($param?->uit ?? 0);
+                $renta5ta = 0.0;
+
+                if ($esHonorarios) {
+                    // RRxHH = sueldo NETO: sin descuentos (no 8%, no AFP) ni aportes ni beneficios.
+                    // SÍ aplican tardanzas, faltas, sábados y domingos/feriados (los maneja el
+                    // motor por asistencia + adicionales). No hay retención.
+                    $renta5ta = 0.0;
+                } else {
                 // Retención de Renta 5ta — método acumulado (igual que el Excel del contador):
                 // proyección anual (12 sueldos + 2 gratificaciones + bonif. de ley 9%),
                 // menos lo ya retenido en meses previos, repartido en los meses que faltan.
                 // En periodos quincenales se retiene la mitad del mensual.
-                $uit = (float) ($param?->uit ?? 0);
-                $renta5ta = 0.0;
-
                 // Si el cliente cargó la Renta 5ta calculada aparte, se respeta ese valor.
                 $rentaManual = \App\Models\IngresoAdicional::where('empresa_id', $periodo->empresa_id)
                     ->where('employee_id', $emp->id)
@@ -101,6 +112,7 @@ class PlanillaService
                     // En la 1ra quincena no se retiene nada.
                     $renta5ta = $periodo->quincena == 1 ? 0.0 : $renta5taMensual;
                 }
+                } // fin else (planilla)
 
                 // Adelantos / cuotas de préstamo a descontar en este periodo (mes).
                 $adelantos = (float) Adelanto::where('empresa_id', $periodo->empresa_id)
@@ -127,7 +139,8 @@ class PlanillaService
                     'modo' => $modoCalculo,
                     'sueldo_basico' => (float) $contrato->sueldo_basico,
                     'asignacion_familiar' => $asigFam,
-                    'movilidad' => (float) $contrato->movilidad,
+                    // Honorarios: NO tienen movilidad (solo su honorario). Planilla: normal.
+                    'movilidad' => $esHonorarios ? 0 : (float) $contrato->movilidad,
                     'dias_base' => $diasBase,
                     'dias_trabajados' => $ag['dias_trabajados'],
                     'minutos_tarde' => $ag['minutos_tarde'],
@@ -143,17 +156,18 @@ class PlanillaService
                     'mov_incentivo' => $bonoAdic,
                     // Ingreso afecto adicional (col. AG "otros pensionables/incentivos" del cliente)
                     'otros_afectos' => $otrosAfectosAdic,
+                    // Honorarios (RxH): sin pensión ni aportes de empleador. Planilla: normal.
                     // Si el contrato no define sistema, se asume ONP; 'NINGUNO' = exonerado.
-                    'sistema_pensiones' => $contrato->sistema_pensiones ?: 'ONP',
-                    'afp' => $contrato->afp,
-                    'tipo_afp' => $contrato->tipo_afp,
-                    'aporta_sctr' => $contrato->aporta_sctr,
-                    'aporta_senati' => $contrato->aporta_senati,
-                    'aporta_essalud' => true,
+                    'sistema_pensiones' => $esHonorarios ? 'NINGUNO' : ($contrato->sistema_pensiones ?: 'ONP'),
+                    'afp' => $esHonorarios ? null : $contrato->afp,
+                    'tipo_afp' => $esHonorarios ? null : $contrato->tipo_afp,
+                    'aporta_sctr' => $esHonorarios ? false : $contrato->aporta_sctr,
+                    'aporta_senati' => $esHonorarios ? false : $contrato->aporta_senati,
+                    'aporta_essalud' => $esHonorarios ? false : true,
                     'essalud_tasa' => 0.09,
-                    'sctr_tasa_pension' => (float) ($polizaSctr->tasa_pension ?? 0),
-                    'sctr_tasa_salud' => (float) ($polizaSctr->tasa_salud ?? 0),
-                    'vida_ley_tasa' => (float) ($polizaVida->tasa ?? 0),
+                    'sctr_tasa_pension' => $esHonorarios ? 0 : (float) ($polizaSctr->tasa_pension ?? 0),
+                    'sctr_tasa_salud' => $esHonorarios ? 0 : (float) ($polizaSctr->tasa_salud ?? 0),
+                    'vida_ley_tasa' => $esHonorarios ? 0 : (float) ($polizaVida->tasa ?? 0),
                     'senati_tasa' => 0,
                     'renta_5ta' => $renta5ta,
                     'adelantos' => $adelantos,
@@ -180,6 +194,9 @@ class PlanillaService
 
                 $payroll->detalles()->create([
                     'employee_id' => $emp->id,
+                    // Se congela aquí: si el trabajador cambia de modalidad después,
+                    // este periodo ya calculado no debe reclasificarse solo.
+                    'modalidad' => $esHonorarios ? 'honorarios' : 'planilla',
                     'base_afecta' => $r['base_afecta'],
                     'total_ingresos' => $r['total_ingresos'],
                     'pension_total' => $r['descuentos']['pension']['total'],

@@ -17,7 +17,7 @@ class Contract extends Model implements Auditable
         'tipo_contrato', 'categoria_ocupacional', 'fecha_ingreso', 'fecha_cese',
         'sueldo_basico', 'percibe_asignacion_familiar', 'movilidad', 'otros',
         'sistema_pensiones', 'afp', 'tipo_afp', 'codigo_afp', 'fecha_afiliacion_pension',
-        'aporta_sctr', 'aporta_senati', 'tiene_vida_ley', 'activo',
+        'aporta_sctr', 'aporta_senati', 'tiene_vida_ley', 'activo', 'retiene_4ta',
     ];
 
     protected $casts = [
@@ -32,6 +32,7 @@ class Contract extends Model implements Auditable
         'aporta_senati' => 'boolean',
         'tiene_vida_ley' => 'boolean',
         'activo' => 'boolean',
+        'retiene_4ta' => 'boolean',
     ];
 
     public function employee(): BelongsTo

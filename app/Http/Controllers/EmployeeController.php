@@ -50,9 +50,10 @@ class EmployeeController extends Controller
                     'fecha_cese' => $c?->fecha_cese?->toDateString(),
                     'dias_vencimiento' => $diasVencimiento,
                     'activo' => $e->activo,
+                    'modalidad' => $e->modalidad,
                     // Datos para el modal de edición
                     'empleado' => $e->only([
-                        'id', 'empresa_id', 'apellido_paterno', 'apellido_materno', 'nombres', 'tipo_documento',
+                        'id', 'empresa_id', 'modalidad', 'apellido_paterno', 'apellido_materno', 'nombres', 'tipo_documento',
                         'numero_documento', 'ruc', 'fecha_nacimiento', 'genero', 'estado_civil', 'lugar_nacimiento',
                         'profesion', 'telefono', 'correo', 'sede_id', 'direccion', 'distrito', 'provincia',
                         'departamento', 'tipo_vivienda', 'nivel_educativo', 'banco', 'cuenta_corriente',
@@ -170,6 +171,27 @@ class EmployeeController extends Controller
         return back()->with('success', 'Empleado eliminado.');
     }
 
+    /**
+     * Cesa o reactiva a un trabajador. Cesar = sale de las NUEVAS planillas
+     * (no aparece), pero se conserva TODO su historial. Reactivar = vuelve.
+     * No borra nada ni toca cálculos.
+     */
+    public function toggleActivo(Employee $empleado)
+    {
+        $nuevo = ! $empleado->activo;
+        $empleado->update(['activo' => $nuevo]);
+
+        // Registra/limpia la fecha de cese en su contrato (dato informativo).
+        $contrato = $empleado->contratos()->latest('id')->first();
+        if ($contrato) {
+            $contrato->update(['fecha_cese' => $nuevo ? null : now()->toDateString()]);
+        }
+
+        return back()->with('success', $nuevo
+            ? 'Trabajador reactivado: volverá a aparecer en la planilla.'
+            : 'Trabajador cesado: ya no aparecerá en nuevas planillas (su historial se conserva).');
+    }
+
     /** Catálogos para filtros y formulario (todas las empresas; se filtran en el cliente). */
     private function datosFormulario(): array
     {
@@ -190,6 +212,7 @@ class EmployeeController extends Controller
         $request->validate([
             // Empleado
             'empresa_id' => ['required', 'exists:empresas,id'],
+            'modalidad' => ['nullable', 'in:planilla,honorarios'],
             'apellido_paterno' => ['required', 'string', 'max:255'],
             'apellido_materno' => ['nullable', 'string', 'max:255'],
             'nombres' => ['required', 'string', 'max:255'],
@@ -235,6 +258,7 @@ class EmployeeController extends Controller
             'aporta_sctr' => ['boolean'],
             'aporta_senati' => ['boolean'],
             'tiene_vida_ley' => ['boolean'],
+            'retiene_4ta' => ['boolean'],
             'area_id' => ['nullable', 'exists:areas,id'],
             'cargo_id' => ['nullable', 'exists:cargos,id'],
             'turno_id' => ['nullable', 'exists:turnos,id'],
@@ -248,7 +272,7 @@ class EmployeeController extends Controller
 
         return [
             'empleado' => $request->only([
-                'empresa_id', 'apellido_paterno', 'apellido_materno', 'nombres', 'tipo_documento',
+                'empresa_id', 'modalidad', 'apellido_paterno', 'apellido_materno', 'nombres', 'tipo_documento',
                 'numero_documento', 'ruc', 'fecha_nacimiento', 'genero', 'estado_civil', 'lugar_nacimiento',
                 'profesion', 'telefono', 'correo', 'sede_id', 'direccion', 'distrito', 'provincia',
                 'departamento', 'tipo_vivienda', 'nivel_educativo', 'banco', 'cuenta_corriente',

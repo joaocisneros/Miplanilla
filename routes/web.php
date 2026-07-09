@@ -53,6 +53,7 @@ Route::middleware('auth')->group(function () {
         Route::post('empleados', [EmployeeController::class, 'store'])->name('empleados.store');
         Route::put('empleados/{empleado}', [EmployeeController::class, 'update'])->name('empleados.update');
         Route::delete('empleados/{empleado}', [EmployeeController::class, 'destroy'])->name('empleados.destroy');
+        Route::patch('empleados/{empleado}/estado', [EmployeeController::class, 'toggleActivo'])->name('empleados.estado');
         Route::post('empleados/{empleado}/documentos', [EmpleadoDocumentoController::class, 'subir'])->name('empleados.documentos.subir');
         Route::delete('documentos/{documento}', [EmpleadoDocumentoController::class, 'eliminar'])->name('empleados.documentos.eliminar');
     });
@@ -84,6 +85,14 @@ Route::middleware('auth')->group(function () {
         Route::post('planilla/periodos/{periodo}/generar', [PlanillaController::class, 'generar'])->name('planilla.generar');
     });
     Route::post('planilla/{payroll}/cerrar', [PlanillaController::class, 'cerrar'])->middleware('permission:planilla.cerrar')->name('planilla.cerrar');
+
+    // Recibos por Honorarios (RxH): mismo patrón que Planilla (lista de periodos -> detalle por trabajador)
+    Route::get('honorarios', [\App\Http\Controllers\HonorarioController::class, 'index'])->middleware('permission:planilla.ver')->name('honorarios.index');
+    Route::post('honorarios/generar', [\App\Http\Controllers\HonorarioController::class, 'generar'])->middleware('permission:planilla.generar')->name('honorarios.generar');
+    Route::get('honorarios/detalle/{detalle}/recibo', [\App\Http\Controllers\HonorarioController::class, 'recibo'])->middleware('permission:boletas.ver')->name('honorarios.recibo');
+    Route::get('honorarios/{payroll}', [\App\Http\Controllers\HonorarioController::class, 'show'])->middleware('permission:planilla.ver')->name('honorarios.show');
+    Route::get('honorarios/{payroll}/excel', [\App\Http\Controllers\HonorarioController::class, 'export'])->middleware('permission:planilla.ver')->name('honorarios.excel');
+    Route::get('honorarios/{payroll}/recibos-zip', [\App\Http\Controllers\HonorarioController::class, 'reciboZip'])->middleware('permission:boletas.ver')->name('honorarios.recibos-zip');
 
     // Gratificaciones (Julio / Diciembre)
     Route::get('gratificaciones', [GratificacionController::class, 'index'])->middleware('permission:planilla.ver')->name('gratificaciones.index');

@@ -24,7 +24,14 @@ class PlanillaController extends Controller
             ->orderByDesc('anio')->orderByDesc('mes')->orderByDesc('quincena')
             ->get()
             ->map(function ($p) {
-                $payroll = Payroll::where('periodo_id', $p->id)->first();
+                $payroll = Payroll::with('detalles')->where('periodo_id', $p->id)->first();
+                // Los de honorarios (RxH) no cuentan aquí: tienen su propio módulo y sus
+                // propios totales, para no mezclar cifras con la planilla regular. Se usa
+                // la modalidad CONGELADA en el detalle (no la actual del empleado), porque
+                // si el trabajador cambia de modalidad después, este periodo ya calculado
+                // no debe reclasificarse solo.
+                $dets = $payroll?->detalles->filter(fn ($d) => ($d->modalidad ?? 'planilla') !== 'honorarios');
+
                 return [
                     'id' => $p->id,
                     'descripcion' => $p->descripcion,
@@ -35,8 +42,8 @@ class PlanillaController extends Controller
                     'payroll' => $payroll ? [
                         'id' => $payroll->id,
                         'estado' => $payroll->estado,
-                        'total_neto' => $payroll->total_neto,
-                        'cantidad_empleados' => $payroll->cantidad_empleados,
+                        'total_neto' => round($dets->sum('neto'), 2),
+                        'cantidad_empleados' => $dets->count(),
                     ] : null,
                 ];
             });
@@ -104,7 +111,11 @@ class PlanillaController extends Controller
 
     public function show(Request $request, Payroll $payroll): Response
     {
-        $payroll->load(['periodo', 'empresa', 'detalles.employee:id,apellido_paterno,apellido_materno,nombres', 'detalles.employee.contratoVigente']);
+        $payroll->load(['periodo', 'empresa', 'detalles.employee:id,apellido_paterno,apellido_materno,nombres,modalidad', 'detalles.employee.contratoVigente']);
+
+        // Solo empleados de PLANILLA aquí; los honorarios (RxH) van en su propio módulo.
+        // Se usa la modalidad congelada en el detalle, no la actual del empleado.
+        $dets = $payroll->detalles->filter(fn ($d) => ($d->modalidad ?? 'planilla') !== 'honorarios')->values();
 
         return Inertia::render('Planilla/Show', [
             'payroll' => [
@@ -112,13 +123,13 @@ class PlanillaController extends Controller
                 'estado' => $payroll->estado,
                 'descripcion' => $payroll->periodo->descripcion,
                 'empresa' => $payroll->empresa->razon_social,
-                'total_ingresos' => $payroll->total_ingresos,
-                'total_descuentos' => $payroll->total_descuentos,
-                'total_neto' => $payroll->total_neto,
-                'total_aportes_empleador' => $payroll->total_aportes_empleador,
-                'cantidad_empleados' => $payroll->cantidad_empleados,
+                'total_ingresos' => round($dets->sum('total_ingresos'), 2),
+                'total_descuentos' => round($dets->sum('total_descuentos'), 2),
+                'total_neto' => round($dets->sum('neto'), 2),
+                'total_aportes_empleador' => round($dets->sum(fn ($d) => (float) $d->essalud + (float) $d->sctr_pension + (float) $d->sctr_salud + (float) $d->vida_ley + (float) $d->senati), 2),
+                'cantidad_empleados' => $dets->count(),
             ],
-            'detalles' => $payroll->detalles->map(function ($d) {
+            'detalles' => $dets->map(function ($d) {
                 $c = $d->employee?->contratoVigente->first();
                 $sistema = $c?->sistema_pensiones === 'AFP'
                     ? 'AFP '.($c->afp ?? '')
@@ -156,6 +167,9 @@ class PlanillaController extends Controller
             'detalles.employee.contratoVigente.cargo:id,nombre',
         ]);
 
+        // Honorarios (RxH) no va en este Excel: tiene su propio export en el módulo Honorarios.
+        $detalles = $payroll->detalles->filter(fn ($d) => ($d->modalidad ?? 'planilla') !== 'honorarios');
+
         $n = fn ($v) => round((float) $v, 2);
 
         $headings = [
@@ -170,7 +184,7 @@ class PlanillaController extends Controller
 
         $rows = [];
         $i = 1;
-        foreach ($payroll->detalles as $d) {
+        foreach ($detalles as $d) {
             $e = $d->employee;
             $c = $e?->contratoVigente->first();
             $g = (array) $d->desglose;

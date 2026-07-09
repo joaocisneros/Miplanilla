@@ -79,7 +79,9 @@ class ReporteController extends Controller
 
         $porEmpresa = $payrolls->groupBy('empresa_id')->map(function ($grupo) {
             $emp = $grupo->first()->empresa;
-            $det = $grupo->flatMap->detalles;
+            // Honorarios (RxH) tiene su propio módulo y reportes; no se mezcla aquí.
+            // Usa la modalidad congelada en el detalle, no la actual del empleado.
+            $det = $grupo->flatMap->detalles->filter(fn ($d) => ($d->modalidad ?? 'planilla') !== 'honorarios');
             $sum = fn ($col) => round($det->sum(fn ($d) => (float) $d->$col), 2);
 
             $ingresos = $sum('total_ingresos');
@@ -138,8 +140,12 @@ class ReporteController extends Controller
             ->whereHas('periodo', fn ($q) => $q->where('anio', $anio)->where('mes', $mes))
             ->get();
 
+        // Honorarios (RxH) no va en PLAME/AFPnet: no cuentan aquí (declaración distinta).
+        // Usa la modalidad congelada en el detalle, no la actual del empleado.
         $porEmpresa = $payrolls->groupBy('empresa_id')->map(function ($grupo) {
-            return $this->resumirEmpresa($grupo->first()->empresa, $grupo->flatMap->detalles);
+            $det = $grupo->flatMap->detalles->filter(fn ($d) => ($d->modalidad ?? 'planilla') !== 'honorarios');
+
+            return $this->resumirEmpresa($grupo->first()->empresa, $det);
         })->values();
 
         $totalGeneral = [
@@ -210,7 +216,7 @@ class ReporteController extends Controller
     private function datosRetenciones(int $anio, ?int $empresaId): array
     {
         $payrolls = Payroll::with([
-            'detalles:id,payroll_id,employee_id,renta_5ta',
+            'detalles:id,payroll_id,employee_id,modalidad,renta_5ta',
             'detalles.employee:id,numero_documento,apellido_paterno,apellido_materno,nombres',
             'periodo:id,mes',
             'empresa:id,razon_social',
@@ -224,7 +230,9 @@ class ReporteController extends Controller
             $mes = (int) $p->periodo->mes;
             foreach ($p->detalles as $d) {
                 $e = $d->employee;
-                if (! $e) {
+                // Honorarios (RxH) no tiene renta 5ta (es otra categoría); no va en este reporte.
+                // Usa la modalidad congelada en el detalle, no la actual del empleado.
+                if (! $e || ($d->modalidad ?? 'planilla') === 'honorarios') {
                     continue;
                 }
                 $trab[$e->id] ??= [
