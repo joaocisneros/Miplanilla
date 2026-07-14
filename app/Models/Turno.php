@@ -11,12 +11,13 @@ class Turno extends Model
     protected $fillable = [
         'nombre', 'hora_entrada', 'hora_salida', 'refrigerio_min',
         'tolerancia_min', 'cruza_medianoche', 'minutos_jornada', 'activo',
-        'trabaja_sabado', 'hora_salida_sabado',
+        'trabaja_sabado', 'hora_salida_sabado', 'trabaja_domingo',
     ];
 
     protected $casts = [
         'cruza_medianoche' => 'boolean',
         'activo' => 'boolean',
         'trabaja_sabado' => 'boolean',
+        'trabaja_domingo' => 'boolean',
     ];
 }

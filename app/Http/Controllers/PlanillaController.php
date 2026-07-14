@@ -59,9 +59,32 @@ class PlanillaController extends Controller
     {
         $data = $this->validarPeriodo($request, conEmpresa: true);
 
+        if ($error = $this->conflictoQuincenaMensual($data['empresa_id'], (int) $data['anio'], (int) $data['mes'], $data['quincena'] ?? null)) {
+            return back()->with('error', $error);
+        }
+
         Periodo::create($data);
 
         return back()->with('success', 'Periodo creado.');
+    }
+
+    /**
+     * Un mes se maneja por quincenas O mensual, nunca ambos: mezclar duplica
+     * los pagos en el Consolidado y los reportes. Devuelve el mensaje de error
+     * si el periodo pedido choca con lo que ya existe.
+     */
+    private function conflictoQuincenaMensual(int $empresaId, int $anio, int $mes, ?int $quincena): ?string
+    {
+        $base = Periodo::where('empresa_id', $empresaId)->where('anio', $anio)->where('mes', $mes);
+
+        if ($quincena === null && (clone $base)->whereNotNull('quincena')->exists()) {
+            return 'Este mes ya se maneja por QUINCENAS: generar el "mes completo" duplicaría los pagos. Usa 1ra o 2da quincena.';
+        }
+        if ($quincena !== null && (clone $base)->whereNull('quincena')->exists()) {
+            return 'Este mes ya tiene una planilla MENSUAL: generar quincenas duplicaría los pagos. Elimina primero la mensual o usa ese periodo.';
+        }
+
+        return null;
     }
 
     /**
@@ -77,6 +100,11 @@ class PlanillaController extends Controller
         $generadas = 0;
 
         foreach ($empresas as $empresa) {
+            // Candado quincena/mensual: si choca, se salta esa empresa.
+            if ($this->conflictoQuincenaMensual($empresa->id, (int) $data['anio'], (int) $data['mes'], $data['quincena'] ?? null)) {
+                continue;
+            }
+
             $periodo = Periodo::firstOrCreate(
                 [
                     'empresa_id' => $empresa->id,
@@ -94,6 +122,10 @@ class PlanillaController extends Controller
             $service->generar($periodo, $request->user()->id);
             $periodo->update(['estado' => 'calculado']);
             $generadas++;
+        }
+
+        if ($generadas === 0) {
+            return back()->with('error', 'No se generó ninguna planilla: el periodo elegido choca con periodos existentes (quincenas vs mes completo) o todo está cerrado.');
         }
 
         return back()->with('success', "Planillas generadas en {$generadas} empresa(s), cada una por separado.");
@@ -172,12 +204,15 @@ class PlanillaController extends Controller
 
         $n = fn ($v) => round((float) $v, 2);
 
+        // Orden pedido por el cliente: la pensión al costado del Sistema, y el
+        // descuento de tardanza al costado de sus minutos.
         $headings = [
-            'N°', 'DNI', 'Apellidos y Nombres', 'Cargo', 'Sistema',
+            'N°', 'DNI', 'Apellidos y Nombres', 'Cargo',
+            'Sistema', 'Aporte pensión', 'Comisión', 'Prima',
             'Sueldo devengado', 'Movilidad', 'H. Extra', 'Sábado', 'Dom/Fer', 'Incentivo/Bono', 'Gratificación', 'Vacaciones',
             'TOTAL INGRESOS',
-            'Días trab.', 'Faltas', 'Tardanza (min)',
-            'Aporte pensión', 'Comisión', 'Prima', 'Renta 5ta', 'Adelantos', 'Desc. tardanza',
+            'Días trab.', 'Faltas', 'Tardanza (min)', 'Desc. tardanza',
+            'Renta 5ta', 'Adelantos',
             'TOTAL DESCUENTOS', 'Reintegros', 'NETO A PAGAR',
             'EsSalud', 'SCTR', 'Vida Ley',
         ];
@@ -202,6 +237,9 @@ class PlanillaController extends Controller
                 $e?->nombre_completo,
                 $c?->cargo?->nombre ?? '',
                 trim($sistema),
+                $n($pen['aporte'] ?? 0),
+                $n($pen['comision'] ?? 0),
+                $n($pen['prima'] ?? 0),
                 $n($ing['remuneracion_devengada'] ?? 0),
                 $n($ing['movilidad'] ?? 0),
                 $n($ing['horas_extra'] ?? 0),
@@ -214,12 +252,9 @@ class PlanillaController extends Controller
                 $asis['dias_trabajados'] ?? ($g['dias_trabajados'] ?? 0),
                 $asis['faltas'] ?? 0,
                 $asis['minutos_tarde'] ?? 0,
-                $n($pen['aporte'] ?? 0),
-                $n($pen['comision'] ?? 0),
-                $n($pen['prima'] ?? 0),
+                $n($desc['tardanza'] ?? 0),
                 $n($desc['renta_5ta'] ?? 0),
                 $n($desc['adelantos'] ?? 0),
-                $n($desc['tardanza'] ?? 0),
                 $n($d->total_descuentos),
                 $n($g['reintegros'] ?? 0),
                 $n($d->neto),
@@ -232,7 +267,7 @@ class PlanillaController extends Controller
         $nombre = 'planilla_detallada_'.Str::slug($payroll->empresa->razon_social).'_'.Str::slug($payroll->periodo->descripcion).'.xlsx';
 
         // Columnas de dinero (1-based) y columna del NETO para el formato/color.
-        $moneyCols = [6, 7, 8, 9, 10, 11, 12, 13, 14, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29];
+        $moneyCols = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 21, 22, 23, 24, 25, 26, 27, 28, 29];
 
         return Excel::download(new PlanillaDetalleExport($headings, $rows, $moneyCols, 26), $nombre);
     }
@@ -243,6 +278,15 @@ class PlanillaController extends Controller
         $payroll->periodo->update(['estado' => 'cerrado']);
 
         return back()->with('success', 'Planilla cerrada. Ya no se puede recalcular.');
+    }
+
+    /** Reabre un periodo cerrado. Solo ADMIN (ver rutas). */
+    public function reabrir(Request $request, Payroll $payroll)
+    {
+        $payroll->update(['estado' => 'calculado', 'cerrado_at' => null]);
+        $payroll->periodo->update(['estado' => 'calculado']);
+
+        return back()->with('success', 'Planilla reabierta. Se puede volver a recalcular.');
     }
 
     private function validarPeriodo(Request $request, bool $conEmpresa = false): array

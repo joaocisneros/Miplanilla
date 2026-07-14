@@ -71,11 +71,11 @@ const inp = 'block w-full rounded-md border-gray-300 text-sm';
 </script>
 
 <template>
-    <Head title="Resumen mensual de asistencia" />
+    <Head title="Consolidado de asistencia" />
     <AuthenticatedLayout>
         <template #header>
             <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold text-gray-800">Resumen mensual de asistencia</h2>
+                <h2 class="text-xl font-semibold text-gray-800">Consolidado de asistencia</h2>
                 <a :href="route('asistencia.diario')" class="text-sm text-indigo-600 hover:text-indigo-900">Registro diario →</a>
             </div>
         </template>

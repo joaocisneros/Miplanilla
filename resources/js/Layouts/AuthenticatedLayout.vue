@@ -39,7 +39,7 @@ const menu = computed(() => [
         titulo: 'Asistencia',
         items: [
             { label: 'Asistencia diaria', icon: '🕒', route: 'asistencia.diario', active: 'asistencia.diario', show: can('asistencia.ver') },
-            { label: 'Resumen mensual', icon: '📋', route: 'asistencia.resumen', active: 'asistencia.resumen', show: can('asistencia.ver') },
+            { label: 'Consolidado de asistencia', icon: '📋', route: 'asistencia.resumen', active: 'asistencia.resumen', show: can('asistencia.ver') },
             { label: 'Historial asistencia', icon: '📅', route: 'asistencia.index', active: 'asistencia.index', show: can('asistencia.ver') },
         ],
     },
@@ -48,8 +48,9 @@ const menu = computed(() => [
         items: [
             { label: 'Planilla', icon: '💰', route: 'planilla.index', active: 'planilla.*', show: can('planilla.ver') },
             { label: 'Honorarios (RxH)', icon: '🧾', route: 'honorarios.index', active: 'honorarios.*', show: can('planilla.ver') },
-            { label: 'Horas extra y bonos', icon: '⏱️', route: 'adicionales.index', active: 'adicionales.*', show: can('planilla.ver') },
+            { label: 'Bonos y pagos extra', icon: '💵', route: 'adicionales.index', active: 'adicionales.*', show: can('planilla.ver') },
             { label: 'Adelantos / Préstamos', icon: '💸', route: 'adelantos.index', active: 'adelantos.*', show: can('planilla.ver') },
+            { label: 'Contratistas (avance)', icon: '🏗️', route: 'contratistas.index', active: 'contratistas.*', show: can('contratistas.ver') },
         ],
     },
     {
@@ -77,6 +78,7 @@ const menu = computed(() => [
             { label: 'Áreas', icon: '🗂️', route: 'admin.areas.index', active: 'admin.areas.*', show: esAdmin.value },
             { label: 'Cargos', icon: '🏷️', route: 'admin.cargos.index', active: 'admin.cargos.*', show: esAdmin.value },
             { label: 'Turnos', icon: '⏰', route: 'admin.turnos.index', active: 'admin.turnos.*', show: esAdmin.value },
+            { label: 'Feriados', icon: '🎉', route: 'admin.feriados.index', active: 'admin.feriados.*', show: esAdmin.value },
         ],
     },
     {

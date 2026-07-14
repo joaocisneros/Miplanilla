@@ -75,7 +75,7 @@ class AsistenciaController extends Controller
 
             // Turno de cada trabajador (para calcular tardanza y H.E. automáticas en pantalla).
             $turnos = \App\Models\Contract::whereIn('employee_id', $empleados->pluck('id'))
-                ->where('activo', true)->with('turno:id,hora_entrada,hora_salida,hora_salida_sabado,trabaja_sabado,tolerancia_min')
+                ->where('activo', true)->with('turno:id,nombre,hora_entrada,hora_salida,hora_salida_sabado,trabaja_sabado,tolerancia_min')
                 ->get()->keyBy('employee_id');
 
             $esSabado = \Carbon\Carbon::parse($fecha)->isSaturday();
@@ -109,6 +109,7 @@ class AsistenciaController extends Controller
 
         return Inertia::render('Asistencia/Diario', [
             'fecha' => $fecha,
+            'feriado' => \App\Models\Feriado::whereDate('fecha', $fecha)->value('nombre'),
             'filas' => $filas,
             'filtros' => ['empresa_id' => $empresaId, 'sede_id' => $sedeId],
             'estados' => $this->estadosDisponibles(),
@@ -340,22 +341,30 @@ class AsistenciaController extends Controller
     /** Estados seleccionables en el registro manual (etiqueta en español). */
     private function estadosDisponibles(): array
     {
+        // La aclaración entre paréntesis es solo visual: la importación ignora
+        // el paréntesis, así los Excel viejos ("Falta") siguen importando.
         return [
             'NORMAL' => 'Presente',
-            'FALTA' => 'Falta',
-            'FALTA_JUSTIFICADA' => 'Falta justificada',
+            'FALTA' => 'Falta (descuenta el día)',
+            'FALTA_JUSTIFICADA' => 'Falta justificada (pagada)',
             'VACACIONES' => 'Vacaciones',
-            'LICENCIA' => 'Licencia con goce',
-            'LICENCIA_SIN_GOCE' => 'Licencia sin goce',
+            'LICENCIA' => 'Licencia con goce (pagada)',
+            'LICENCIA_SIN_GOCE' => 'Licencia sin goce (descuenta)',
             'DESCANSO_MEDICO' => 'Descanso médico',
-            'SUBSIDIO' => 'Subsidio',
-            'DESCANSO' => 'Descanso',
+            'SUBSIDIO' => 'Subsidio (EsSalud)',
+            'DESCANSO' => 'Descanso (día libre)',
             'LICENCIA_HIJO_ENFERMO' => 'Licencia hijo enfermo',
-            'FERIADO' => 'Feriado',
-            'TRABAJO_SABADO' => 'Trabajó sábado',
-            'TRABAJO_DOMINGO' => 'Trabajó domingo',
-            'TRABAJO_FERIADO' => 'Trabajó feriado',
+            'FERIADO' => 'Feriado (descansó)',
+            'TRABAJO_SABADO' => 'Trabajó sábado (paga extra)',
+            'TRABAJO_DOMINGO' => 'Trabajó domingo (paga extra)',
+            'TRABAJO_FERIADO' => 'Trabajó feriado (paga extra)',
         ];
+    }
+
+    /** Quita la aclaración "(...)" de una etiqueta de estado, para comparar. */
+    private function baseLabel(string $label): string
+    {
+        return mb_strtoupper(trim(preg_replace('/\s*\(.*\)\s*$/u', '', $label)));
     }
 
     public function import(Request $request)
@@ -482,27 +491,37 @@ class AsistenciaController extends Controller
         $sh->getStyle('A3')->getFont()->setSize(9)->setItalic(true)->getColor()->setRGB('C00000');
 
         // Fila 4: encabezados (barra celeste, texto blanco)
-        $headers = ['EMPRESA', 'DNI', 'NOMBRE', 'FECHA', 'DIA', 'ESTADO', 'ENTRADA (hh:mm)', 'SALIDA (hh:mm)', 'HE APROB', 'OBSERVACION'];
+        $headers = ['EMPRESA', 'DNI', 'NOMBRE', 'FECHA', 'DIA', 'ESTADO', 'ENTRADA (hh:mm)', 'SALIDA (hh:mm)', 'HE APROB', 'OBSERVACION', 'MODALIDAD'];
         $sh->fromArray($headers, null, 'A4');
         $sh->getRowDimension(4)->setRowHeight(20);
-        $sh->getStyle('A4:J4')->getFont()->setBold(true)->getColor()->setRGB('FFFFFF');
-        $sh->getStyle('A4:J4')->getFill()->setFillType($Fill::FILL_SOLID)->getStartColor()->setRGB('2E75B6');
-        $sh->getStyle('A4:J4')->getAlignment()->setHorizontal($Align::HORIZONTAL_CENTER)->setVertical($Align::VERTICAL_CENTER);
+        $sh->getStyle('A4:K4')->getFont()->setBold(true)->getColor()->setRGB('FFFFFF');
+        $sh->getStyle('A4:K4')->getFill()->setFillType($Fill::FILL_SOLID)->getStartColor()->setRGB('2E75B6');
+        $sh->getStyle('A4:K4')->getAlignment()->setHorizontal($Align::HORIZONTAL_CENTER)->setVertical($Align::VERTICAL_CENTER);
 
+        $turnosEmp = $this->turnosPorEmpleado();
+        $feriados = $this->feriadosMap((int) $anio);
+        $lblFeriado = $this->estadosDisponibles()['FERIADO'];
         $r = 5;
         foreach ($empresas as $emp) {
             $ne = $emp->nombre_comercial ?: $emp->razon_social;
             foreach (Employee::where('empresa_id', $emp->id)->where('activo', true)->orderBy('apellido_paterno')->get() as $e) {
+                $turno = $turnosEmp[$e->id]?->turno;
                 for ($d = 1; $d <= $dias; $d++) {
                     $f = Carbon::create($anio, $mes, $d);
+                    $esFeriado = isset($feriados[$f->toDateString()]);
+                    [$entDef, $salDef] = $esFeriado ? ['', ''] : $this->horarioPorDefecto($turno, $f);
                     $sh->setCellValue('A'.$r, $ne);
                     $sh->setCellValueExplicit('B'.$r, (string) $e->numero_documento, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
                     $sh->setCellValue('C'.$r, $e->apellido_paterno.' '.$e->nombres);
                     $sh->setCellValue('D'.$r, $f->format('d/m/Y'));
                     $sh->setCellValue('E'.$r, $diaSem[$f->format('D')]);
-                    $sh->setCellValue('F'.$r, 'Presente');
+                    $sh->setCellValue('F'.$r, $esFeriado ? $lblFeriado : 'Presente');
+                    // Pre-llenado con el horario del turno: el cliente solo cambia excepciones.
+                    $sh->setCellValueExplicit('G'.$r, $entDef, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+                    $sh->setCellValueExplicit('H'.$r, $salDef, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
                     $sh->getCell('F'.$r)->getDataValidation()->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST)->setAllowBlank(false)->setShowDropDown(true)->setFormula1('Listas!$A$1:$A$'.$nEstados);
                     $sh->getCell('I'.$r)->getDataValidation()->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST)->setAllowBlank(true)->setShowDropDown(true)->setFormula1('Listas!$B$1:$B$2');
+                    $sh->setCellValue('K'.$r, ($e->modalidad ?? 'planilla') === 'honorarios' ? 'RXH' : 'PLANILLA');
                     $r++;
                 }
             }
@@ -513,12 +532,13 @@ class AsistenciaController extends Controller
             $sh->getStyle('G5:H'.$ult)->getNumberFormat()->setFormatCode('@');
             // Centrar columnas de fecha/día/estado/horas y borde suave
             $sh->getStyle('D5:I'.$ult)->getAlignment()->setHorizontal($Align::HORIZONTAL_CENTER);
-            $sh->getStyle('A4:J'.$ult)->getBorders()->getAllBorders()->setBorderStyle($Border::BORDER_THIN)->getColor()->setRGB('BFBFBF');
+            $sh->getStyle('K5:K'.$ult)->getAlignment()->setHorizontal($Align::HORIZONTAL_CENTER);
+            $sh->getStyle('A4:K'.$ult)->getBorders()->getAllBorders()->setBorderStyle($Border::BORDER_THIN)->getColor()->setRGB('BFBFBF');
         }
-        foreach (['A' => 20, 'B' => 12, 'C' => 26, 'D' => 11, 'E' => 5, 'F' => 17, 'G' => 9, 'H' => 9, 'I' => 10, 'J' => 24] as $c => $w) {
+        foreach (['A' => 20, 'B' => 12, 'C' => 26, 'D' => 11, 'E' => 5, 'F' => 17, 'G' => 9, 'H' => 9, 'I' => 10, 'J' => 24, 'K' => 12] as $c => $w) {
             $sh->getColumnDimension($c)->setWidth($w);
         }
-        $sh->setAutoFilter('A4:J4');
+        $sh->setAutoFilter('A4:K4');
         $sh->freezePane('A5');
 
         $nombre = 'asistencia_'.$meses[$mes].'_'.$anio.($empresaId ? '_'.\Illuminate\Support\Str::slug($empresas->first()?->nombre_comercial ?: 'empresa') : '_TODAS').'.xlsx';
@@ -605,21 +625,28 @@ class AsistenciaController extends Controller
         $sh->setCellValue('D3', 'Elige EMPRESA y MES aquí ▲ (se filtra solo). Escribe la hora: 8 ó 07:23.');
         $sh->getStyle('D3')->getFont()->setSize(9)->setItalic(true)->getColor()->setRGB('808080');
         // Encabezados (fila 4)
-        $headers = ['EMPRESA', 'DNI', 'NOMBRE', 'MES', 'FECHA', 'DIA', 'ESTADO', 'ENTRADA', 'SALIDA', 'HE APROB', 'OBSERVACION'];
+        $headers = ['EMPRESA', 'DNI', 'NOMBRE', 'MES', 'FECHA', 'DIA', 'ESTADO', 'ENTRADA', 'SALIDA', 'HE APROB', 'OBSERVACION', 'MODALIDAD'];
         $sh->fromArray($headers, null, 'A4');
-        $sh->getStyle('A4:K4')->getFont()->setBold(true)->getColor()->setRGB('FFFFFF');
-        $sh->getStyle('A4:K4')->getFill()->setFillType($Fill::FILL_SOLID)->getStartColor()->setRGB('2E75B6');
-        $sh->getStyle('A4:K4')->getAlignment()->setHorizontal($Align::HORIZONTAL_CENTER);
+        $sh->getStyle('A4:L4')->getFont()->setBold(true)->getColor()->setRGB('FFFFFF');
+        $sh->getStyle('A4:L4')->getFill()->setFillType($Fill::FILL_SOLID)->getStartColor()->setRGB('2E75B6');
+        $sh->getStyle('A4:L4')->getAlignment()->setHorizontal($Align::HORIZONTAL_CENTER);
 
+        $turnosEmp = $this->turnosPorEmpleado();
+        $feriados = $this->feriadosMap((int) $anio);
+        $lblFeriado = $this->estadosDisponibles()['FERIADO'];
         $data = [];
         foreach (Empresa::where('activo', true)->orderBy('id')->get() as $emp) {
             $ne = $emp->nombre_comercial ?: $emp->razon_social;
             foreach (Employee::where('empresa_id', $emp->id)->where('activo', true)->orderBy('apellido_paterno')->get() as $e) {
+                $mod = ($e->modalidad ?? 'planilla') === 'honorarios' ? 'RXH' : 'PLANILLA';
+                $turno = $turnosEmp[$e->id]?->turno;
                 for ($m = 1; $m <= 12; $m++) {
                     $dias = \Carbon\Carbon::create($anio, $m, 1)->daysInMonth;
                     for ($d = 1; $d <= $dias; $d++) {
                         $f = \Carbon\Carbon::create($anio, $m, $d);
-                        $data[] = [$ne, (string) $e->numero_documento, $e->apellido_paterno.' '.$e->nombres, $meses[$m], $f->format('d/m/Y'), $diaSem[$f->format('D')], 'Presente', '', '', '', ''];
+                        $esFeriado = isset($feriados[$f->toDateString()]);
+                        [$entDef, $salDef] = $esFeriado ? ['', ''] : $this->horarioPorDefecto($turno, $f);
+                        $data[] = [$ne, (string) $e->numero_documento, $e->apellido_paterno.' '.$e->nombres, $meses[$m], $f->format('d/m/Y'), $diaSem[$f->format('D')], $esFeriado ? $lblFeriado : 'Presente', $entDef, $salDef, '', '', $mod];
                     }
                 }
             }
@@ -628,14 +655,16 @@ class AsistenciaController extends Controller
         $fin = count($data) + 4;
         $sh->getStyle('B5:B'.$fin)->getNumberFormat()->setFormatCode('@');   // DNI texto (ENTRADA/SALIDA General: "8" se completa al importar)
         $sh->getStyle('D5:J'.$fin)->getAlignment()->setHorizontal($Align::HORIZONTAL_CENTER);
+        $sh->getStyle('L5:L'.$fin)->getAlignment()->setHorizontal($Align::HORIZONTAL_CENTER);
+        $sh->getStyle('H5:I'.$fin)->getNumberFormat()->setFormatCode('@');
         $sh->getCell('G5')->getDataValidation()->setType($DV::TYPE_LIST)->setShowDropDown(true)->setFormula1('Listas!$A$1:$A$'.$nEst)->setSqref('G5:G'.$fin);
         $sh->getCell('J5')->getDataValidation()->setType($DV::TYPE_LIST)->setShowDropDown(true)->setAllowBlank(true)->setFormula1('Listas!$B$1:$B$2')->setSqref('J5:J'.$fin);
-        foreach (['A' => 18, 'B' => 12, 'C' => 24, 'D' => 11, 'E' => 11, 'F' => 5, 'G' => 16, 'H' => 9, 'I' => 9, 'J' => 9, 'K' => 20] as $c => $w) {
+        foreach (['A' => 18, 'B' => 12, 'C' => 24, 'D' => 11, 'E' => 11, 'F' => 5, 'G' => 16, 'H' => 9, 'I' => 9, 'J' => 9, 'K' => 20, 'L' => 12] as $c => $w) {
             $sh->getColumnDimension($c)->setWidth($w);
         }
         // La columna MES (D) queda oculta: el filtro del selector la usa, pero no estorba en la vista.
         $sh->getColumnDimension('D')->setVisible(false);
-        $sh->setAutoFilter('A4:K4');
+        $sh->setAutoFilter('A4:L4');
         $sh->freezePane('A5');
 
         $tmp = storage_path('app/'.uniqid('anual_').'.xlsx');
@@ -672,22 +701,30 @@ class AsistenciaController extends Controller
             ->groupBy('employee_id')
             ->map(fn ($g) => $g->keyBy(fn ($a) => $a->fecha->toDateString()));
 
+        $turnosEmp = $this->turnosPorEmpleado();
+        $feriados = $this->feriadosMap((int) $anio);
         $data = [];
         foreach (Empresa::where('activo', true)->orderBy('id')->get() as $emp) {
             $ne = $emp->nombre_comercial ?: $emp->razon_social;
             foreach (Employee::where('empresa_id', $emp->id)->where('activo', true)->orderBy('apellido_paterno')->get() as $e) {
                 $reg = $registrada[$e->id] ?? collect();
+                $mod = ($e->modalidad ?? 'planilla') === 'honorarios' ? 'RXH' : 'PLANILLA';
+                $turno = $turnosEmp[$e->id]?->turno;
                 for ($m = 1; $m <= 12; $m++) {
                     $dias = \Carbon\Carbon::create($anio, $m, 1)->daysInMonth;
                     for ($d = 1; $d <= $dias; $d++) {
                         $f = \Carbon\Carbon::create($anio, $m, $d);
                         $a = $reg[$f->toDateString()] ?? null;
-                        $estado = $a ? ($labels[$a->estado] ?? 'Presente') : 'Presente';
-                        $ent = ($a && $a->hora_entrada_real) ? substr((string) $a->hora_entrada_real, 0, 5) : '';
-                        $sal = ($a && $a->hora_salida_real) ? substr((string) $a->hora_salida_real, 0, 5) : '';
+                        $esFeriado = isset($feriados[$f->toDateString()]);
+                        $estado = $a ? ($labels[$a->estado] ?? 'Presente') : ($esFeriado ? ($labels['FERIADO'] ?? 'Feriado') : 'Presente');
+                        // Sin registro: se pre-llena con el horario del turno (el cliente
+                        // solo cambia las excepciones); si es feriado, sin horas. Con registro: la hora real.
+                        [$entDef, $salDef] = $esFeriado ? ['', ''] : $this->horarioPorDefecto($turno, $f);
+                        $ent = ($a && $a->hora_entrada_real) ? substr((string) $a->hora_entrada_real, 0, 5) : ($a ? '' : $entDef);
+                        $sal = ($a && $a->hora_salida_real) ? substr((string) $a->hora_salida_real, 0, 5) : ($a ? '' : $salDef);
                         $he = ($a && $a->horas_extra_aprobadas) ? 'SI' : '';
                         $obs = $a->observacion ?? '';
-                        $data[] = [$ne, (string) $e->numero_documento, $e->apellido_paterno.' '.$e->nombres, $meses[$m], $f->format('d/m/Y'), $diaSem[$f->format('D')], $estado, $ent, $sal, $he, $obs];
+                        $data[] = [$ne, (string) $e->numero_documento, $e->apellido_paterno.' '.$e->nombres, $meses[$m], $f->format('d/m/Y'), $diaSem[$f->format('D')], $estado, $ent, $sal, $he, $obs, $mod];
                     }
                 }
             }
@@ -697,13 +734,20 @@ class AsistenciaController extends Controller
         // (borrar miles de filas una por una es lentísimo y llega a colgarse por minutos).
         // En su lugar rellenamos con filas en blanco: limpia los datos viejos (sin fugas de
         // otras empresas) en una sola escritura rápida.
-        $filaVacia = array_fill(0, 11, '');
+        $filaVacia = array_fill(0, 12, '');
         while (count($data) + 4 < $oldFin) {
             $data[] = $filaVacia;
         }
         $sh->fromArray($data, null, 'A5');
         $newFin = count($data) + 4;
         $sh->getStyle('B5:B'.$newFin)->getNumberFormat()->setFormatCode('@');
+        // Columna extra fuera del rango del macro (L): modalidad para diferenciar.
+        $sh->setCellValue('L4', 'MODALIDAD');
+        $sh->getStyle('L4')->getFont()->setBold(true)->getColor()->setRGB('FFFFFF');
+        $sh->getStyle('L4')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setRGB('2E75B6');
+        $sh->getColumnDimension('L')->setWidth(12);
+        // Extender el filtro para incluir MODALIDAD (el macro filtra por valores, no por rango).
+        $sh->setAutoFilter('A4:L4');
 
         $tmp = storage_path('app/'.uniqid('anual_').'.xlsm');
         $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($ss);
@@ -724,7 +768,11 @@ class AsistenciaController extends Controller
     {
         $data = $request->validate([
             'archivo' => ['required', 'file', 'mimes:xlsx,xlsm,xls,csv,txt'],
+            // Mes a importar (opcional): como la plantilla viene PRE-LLENADA con el
+            // horario de todo el año, esto evita registrar meses que no se revisaron.
+            'mes' => ['nullable', 'integer', 'min:1', 'max:12'],
         ]);
+        $soloMes = (int) ($data['mes'] ?? 0);
 
         // Lee TODAS las hojas (soporta un Excel con una pestaña por mes).
         // Se lee directo con PhpSpreadsheet en modo "solo datos" (sin estilos/macros):
@@ -739,7 +787,12 @@ class AsistenciaController extends Controller
         $spreadsheet->disconnectWorksheets();
         unset($spreadsheet);
 
-        $labelACodigo = array_flip($this->estadosDisponibles()); // 'Presente' => 'NORMAL'
+        // 'PRESENTE' => 'NORMAL' — la clave va normalizada (sin paréntesis, mayúsculas)
+        // para aceptar etiquetas viejas ("Falta") y nuevas ("Falta (descuenta el día)").
+        $labelACodigo = [];
+        foreach ($this->estadosDisponibles() as $codigo => $label) {
+            $labelACodigo[$this->baseLabel($label)] = $codigo;
+        }
         $want = ['DNI', 'FECHA', 'ESTADO', 'ENTRADA', 'SALIDA', 'HE APROB', 'OBSERVACION'];
         $trabajadoEstados = ['NORMAL', 'TRABAJO_SABADO', 'TRABAJO_DOMINGO', 'TRABAJO_FERIADO'];
         $turnos = [];
@@ -747,7 +800,7 @@ class AsistenciaController extends Controller
         $noEmp = [];
         $hojasLeidas = 0;
 
-        DB::transaction(function () use ($hojas, $want, $labelACodigo, $trabajadoEstados, &$turnos, &$procesados, &$noEmp, &$hojasLeidas) {
+        DB::transaction(function () use ($hojas, $want, $labelACodigo, $trabajadoEstados, $soloMes, &$turnos, &$procesados, &$noEmp, &$hojasLeidas) {
             foreach ($hojas as $filas) {
                 // Ubicar la fila de encabezados (DNI + FECHA) y mapear columnas (flexible).
                 $hIdx = null;
@@ -780,7 +833,7 @@ class AsistenciaController extends Controller
                     }
 
                     $estadoLabel = trim((string) ($row[$cols['ESTADO']] ?? 'Presente'));
-                    $estado = $labelACodigo[$estadoLabel] ?? 'NORMAL';
+                    $estado = $labelACodigo[$this->baseLabel($estadoLabel)] ?? 'NORMAL';
                     $entrada = $this->normHora($row[$cols['ENTRADA']] ?? '');
                     $salida = $this->normHora($row[$cols['SALIDA']] ?? '');
                     $heAprob = mb_strtoupper(trim((string) ($row[$cols['HE APROB']] ?? ''))) === 'SI';
@@ -792,12 +845,25 @@ class AsistenciaController extends Controller
                     }
 
                     $emp = Employee::where('numero_documento', $dni)->first();
+                    // Excel suele comerse el cero inicial del DNI: reintentar con pad a 8.
+                    if (! $emp && ctype_digit($dni) && strlen($dni) < 8) {
+                        $emp = Employee::where('numero_documento', str_pad($dni, 8, '0', STR_PAD_LEFT))->first();
+                    }
                     if (! $emp) {
                         $noEmp[$dni] = true;
                         continue;
                     }
                     $fecha = $this->normFecha($fechaRaw);
                     if (! $fecha) {
+                        continue;
+                    }
+                    // Las plantillas vienen PRE-LLENADAS con el horario del turno:
+                    // los dias que aun no llegan no son asistencia real, se ignoran.
+                    if ($fecha > now()->toDateString()) {
+                        continue;
+                    }
+                    // Si se eligio un mes, solo entra ese mes (protege los meses no revisados).
+                    if ($soloMes && (int) substr($fecha, 5, 2) !== $soloMes) {
                         continue;
                     }
 
@@ -852,6 +918,55 @@ class AsistenciaController extends Controller
         }
 
         return back()->with('success', $msg);
+    }
+
+    /** Fechas de feriado (Y-m-d => nombre), para plantillas y avisos. */
+    private function feriadosMap(?int $anio = null): array
+    {
+        // Automantenido: si el año pedido aun no tiene feriados, se generan solos.
+        \App\Models\Feriado::asegurarAnio($anio ?? (int) now()->year);
+
+        return \App\Models\Feriado::pluck('nombre', 'fecha')
+            ->mapWithKeys(fn ($n, $f) => [substr((string) $f, 0, 10) => $n])->all();
+    }
+
+    /**
+     * Horario por defecto del día según el turno del trabajador, para PRE-LLENAR
+     * las plantillas (el cliente solo cambia las excepciones). Domingo va vacío;
+     * sábado solo si el turno trabaja sábado.
+     */
+    private function horarioPorDefecto($turno, \Carbon\Carbon $f): array
+    {
+        $dow = (int) $f->format('N');
+        if ($dow === 7) {
+            // Domingo: solo turnos que trabajan domingo (ej. vigilancia con relevos).
+            if ($turno && $turno->trabaja_domingo) {
+                return [substr((string) $turno->hora_entrada, 0, 5), substr((string) $turno->hora_salida, 0, 5)];
+            }
+
+            return ['', ''];
+        }
+        if ($dow === 6) {
+            if (! $turno || ! $turno->trabaja_sabado) {
+                return ['', ''];
+            }
+
+            return [substr((string) $turno->hora_entrada, 0, 5),
+                substr((string) ($turno->hora_salida_sabado ?: $turno->hora_salida), 0, 5)];
+        }
+        if (! $turno) {
+            return ['07:00', '18:00'];
+        }
+
+        return [substr((string) $turno->hora_entrada, 0, 5), substr((string) $turno->hora_salida, 0, 5)];
+    }
+
+    /** Turno vigente por empleado (para pre-llenar horarios en las plantillas). */
+    private function turnosPorEmpleado()
+    {
+        return \App\Models\Contract::where('activo', true)
+            ->with('turno:id,hora_entrada,hora_salida,hora_salida_sabado,trabaja_sabado,trabaja_domingo')
+            ->get()->keyBy('employee_id');
     }
 
     /** Normaliza una hora de celda ("07:23", "8", fracción de Excel, etc.) a "H:i" o null. */

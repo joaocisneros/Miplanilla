@@ -10,6 +10,17 @@ defineProps({
 });
 const money = (v) => 'S/ ' + Number(v ?? 0).toLocaleString('es-PE', { minimumFractionDigits: 2 });
 
+// Desglose de "Movilidad y extras" para el tooltip de la celda.
+const desgloseMov = (d) => {
+    const ing = d?.desglose?.ingresos ?? {};
+    const partes = [
+        ['Movilidad', ing.movilidad], ['Sábados', ing.sabado], ['Dom/Fer', ing.domingo_feriado],
+        ['H. extra', ing.horas_extra], ['Bono/Comisión', ing.incentivos],
+    ].filter(([, v]) => Number(v || 0) !== 0)
+        .map(([n, v]) => `${n}: S/ ${Number(v).toFixed(2)}`);
+    return partes.length ? partes.join('  ·  ') : 'Sin movilidad ni extras este periodo';
+};
+
 const aportesTotal = (d) => Object.values(d?.desglose?.aportes_empleador ?? {}).reduce((s, v) => s + Number(v || 0), 0);
 const costoEmpresa = (d) => Number(d?.total_ingresos || 0) + aportesTotal(d);
 
@@ -57,16 +68,16 @@ function verDetalle(d) {
                 <div class="overflow-x-auto bg-white shadow-sm sm:rounded-lg">
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
                         <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
-                            <tr><th class="px-4 py-3">Trabajador</th><th class="px-4 py-3">Sistema</th><th class="px-4 py-3">Base afecta</th><th class="px-4 py-3">Pensión</th><th class="px-4 py-3">Rem. neta quincenal</th><th class="px-4 py-3">Total movilidad</th><th class="px-4 py-3">Renta 5ta</th><th class="px-4 py-3">Neto</th><th class="px-4 py-3 text-right">Acciones</th></tr>
+                            <tr><th class="px-4 py-3">Trabajador</th><th class="px-4 py-3">Sistema</th><th class="px-4 py-3">Pensión</th><th class="px-4 py-3">Base afecta</th><th class="px-4 py-3">Rem. neta quincenal</th><th class="px-4 py-3" title="Movilidad + sábados + domingos + horas extra + bonos">Movilidad y extras</th><th class="px-4 py-3">Renta 5ta</th><th class="px-4 py-3">Neto</th><th class="px-4 py-3 text-right">Acciones</th></tr>
                         </thead>
                         <tbody class="divide-y divide-gray-200">
                             <tr v-for="d in detalles" :key="d.id" class="hover:bg-gray-50">
                                 <td class="px-4 py-2 font-medium text-gray-900">{{ d.empleado }}</td>
                                 <td class="px-4 py-2"><span :class="d.sistema?.startsWith('AFP') ? 'bg-purple-100 text-purple-800' : 'bg-sky-100 text-sky-800'" class="rounded-full px-2 py-1 text-xs">{{ d.sistema }}</span></td>
-                                <td class="px-4 py-2">{{ money(d.base_afecta) }}</td>
                                 <td class="px-4 py-2 text-red-600">{{ money(d.pension_total) }}</td>
+                                <td class="px-4 py-2">{{ money(d.base_afecta) }}</td>
                                 <td class="px-4 py-2 font-medium">{{ money(d.rem_neta_quincenal) }}</td>
-                                <td class="px-4 py-2 text-amber-700">{{ money(d.total_movilidad) }}</td>
+                                <td class="px-4 py-2 text-amber-700 cursor-help" :title="desgloseMov(d)">{{ money(d.total_movilidad) }}</td>
                                 <td class="px-4 py-2 text-red-600">{{ money(d.renta_5ta) }}</td>
                                 <td class="px-4 py-2 font-semibold text-green-700">{{ money(d.neto) }}</td>
                                 <td class="px-4 py-2">

@@ -5,6 +5,7 @@ import { computed, ref } from 'vue';
 
 const props = defineProps({
     fecha: String,
+    feriado: { type: String, default: null },
     filas: { type: Array, default: () => [] },
     filtros: { type: Object, default: () => ({ empresa_id: null, sede_id: null }) },
     estados: { type: Object, default: () => ({}) },
@@ -31,6 +32,14 @@ function aMin(hhmm) {
     const [h, m] = hhmm.split(':').map(Number);
     return h * 60 + m;
 }
+// Hora desde la que cuenta la tardanza (entrada del turno + tolerancia), para el tooltip.
+function desdeTolerancia(f) {
+    const m = aMin(f.turno_entrada);
+    if (m === null) return '';
+    const total = m + (f.turno_tolerancia || 0);
+    return String(Math.floor(total / 60)).padStart(2, '0') + ':' + String(total % 60).padStart(2, '0');
+}
+
 // Recalcula tardanza (min) y horas extra según el horario del turno y las horas marcadas.
 function recalc(f) {
     if (!trabajado(f.estado)) { f.minutos_tarde = 0; f.horas_extra = 0; f.horas_extra_aprobadas = false; return; }
@@ -108,8 +117,39 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                 </div>
 
                 <template v-else>
+                    <div v-if="feriado" class="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm font-medium text-amber-900">
+                        🎉 <b>Hoy es feriado: {{ feriado }}.</b> A los que descansaron márcalos <b>"Feriado (descansó)"</b>; a los que vinieron a trabajar, <b>"Trabajó feriado (paga extra)"</b>.
+                    </div>
                     <div class="rounded-lg bg-blue-50 p-4 text-sm text-blue-800">
-                        Todos aparecen como <b>Presente</b> por defecto. Pon la <b>hora de entrada/salida</b> (la tardanza se calcula sola con el turno + 20 min de tolerancia), o cambia el estado a quien faltó. Marca <b>HE aprob.</b> solo si el supervisor aprobó las horas extra. Luego guarda.
+                        Todos aparecen como <b>Presente</b> por defecto. Pon la <b>hora de entrada/salida</b> (la tardanza se calcula sola contra la hora de entrada del turno, al minuto exacto), o cambia el estado a quien faltó. Marca <b>HE aprob.</b> solo si el supervisor aprobó las horas extra. Luego guarda.
+                        <details class="mt-2">
+                            <summary class="cursor-pointer font-semibold text-blue-900 hover:underline">📖 ¿Qué significa cada estado? (clic para ver)</summary>
+                            <div class="mt-3 grid grid-cols-1 gap-4 text-xs md:grid-cols-3">
+                                <div class="rounded-md bg-red-50 p-3">
+                                    <div class="mb-1 font-bold text-red-700">🔴 Descuentan el día (no se paga)</div>
+                                    <p class="text-red-900"><b>Falta:</b> no vino y no justificó.</p>
+                                    <p class="text-red-900"><b>Licencia sin goce:</b> permiso acordado pero sin pago.</p>
+                                </div>
+                                <div class="rounded-md bg-green-50 p-3">
+                                    <div class="mb-1 font-bold text-green-700">🟢 El día se paga igual</div>
+                                    <p class="text-green-900"><b>Falta justificada:</b> justificación aceptada.</p>
+                                    <p class="text-green-900"><b>Vacaciones:</b> goce vacacional.</p>
+                                    <p class="text-green-900"><b>Licencia con goce:</b> permiso pagado por ley (fallecimiento, paternidad…).</p>
+                                    <p class="text-green-900"><b>Descanso médico:</b> incapacidad con certificado (primeros 20 días/año los paga la empresa).</p>
+                                    <p class="text-green-900"><b>Subsidio:</b> desde el día 21 lo paga EsSalud.</p>
+                                    <p class="text-green-900"><b>Descanso:</b> su día libre de la semana (ej. rotativo de vigilancia).</p>
+                                    <p class="text-green-900"><b>Licencia hijo enfermo:</b> ley de cuidado familiar.</p>
+                                    <p class="text-green-900"><b>Feriado (descansó):</b> era feriado y se quedó en casa — se paga por ley.</p>
+                                </div>
+                                <div class="rounded-md bg-amber-50 p-3">
+                                    <div class="mb-1 font-bold text-amber-700">🟡 Vino en día especial (paga EXTRA)</div>
+                                    <p class="text-amber-900"><b>Trabajó sábado:</b> vino un sábado que no le tocaba.</p>
+                                    <p class="text-amber-900"><b>Trabajó domingo:</b> vino en su descanso dominical.</p>
+                                    <p class="text-amber-900"><b>Trabajó feriado:</b> vino en feriado — cobra el día más la sobretasa.</p>
+                                    <p class="mt-1 text-amber-800">💡 El monto extra de estos días se registra en <b>«Bonos y pagos extra»</b>.</p>
+                                </div>
+                            </div>
+                        </details>
                     </div>
 
                     <div class="overflow-x-auto bg-white shadow-sm sm:rounded-lg">
@@ -118,6 +158,7 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                                 <tr>
                                     <th class="px-4 py-3">DNI</th>
                                     <th class="px-4 py-3">Trabajador</th>
+                                    <th class="px-4 py-3 w-32">Turno</th>
                                     <th class="px-4 py-3 w-44">Estado</th>
                                     <th class="px-4 py-3 w-28">Entrada</th>
                                     <th class="px-4 py-3 w-28">Salida</th>
@@ -132,6 +173,12 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                                     <td class="whitespace-nowrap px-4 py-2 text-gray-600">{{ f.documento }}</td>
                                     <td class="px-4 py-2 font-medium text-gray-900">{{ f.empleado }}</td>
                                     <td class="px-4 py-2">
+                                        <span v-if="f.turno_entrada" class="whitespace-nowrap rounded-full bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-700" :title="(f.turno_nombre ?? '') + ' · tolerancia ' + (f.turno_tolerancia ?? 0) + ' min (tardanza desde las ' + desdeTolerancia(f) + ')'">
+                                            {{ f.turno_entrada }}–{{ f.turno_salida }}
+                                        </span>
+                                        <span v-else class="rounded-full bg-red-50 px-2 py-1 text-xs font-semibold text-red-600" title="Sin turno asignado: no se puede calcular la tardanza automáticamente">sin turno</span>
+                                    </td>
+                                    <td class="px-4 py-2">
                                         <select v-model="f.estado" @change="recalc(f)" :class="inp">
                                             <option v-for="(label, key) in estados" :key="key" :value="key">{{ label }}</option>
                                         </select>
@@ -144,7 +191,7 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                                     <td class="px-4 py-2"><input v-model="f.observacion" type="text" maxlength="255" :class="inp" placeholder="opcional" /></td>
                                 </tr>
                                 <tr v-if="form.filas.length === 0">
-                                    <td colspan="9" class="px-4 py-6 text-center text-gray-500">No hay empleados activos en esta empresa/sede.</td>
+                                    <td colspan="10" class="px-4 py-6 text-center text-gray-500">No hay empleados activos en esta empresa/sede.</td>
                                 </tr>
                             </tbody>
                         </table>

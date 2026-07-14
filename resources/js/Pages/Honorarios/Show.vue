@@ -71,6 +71,8 @@ const totalDescuentos = (f) => Number(f.desglose?.descuentos?.tardanza || 0) + N
                                 <th class="px-3 py-3 text-right">Honorario</th>
                                 <th class="px-3 py-3 text-right">Sábados</th>
                                 <th class="px-3 py-3 text-right">Dom/Fer</th>
+                                <th class="px-3 py-3 text-right">H. extra</th>
+                                <th class="px-3 py-3 text-right">Bonos</th>
                                 <th class="px-3 py-3 text-right font-bold">Neto a pagar</th>
                                 <th class="px-3 py-3 text-right">Acciones</th>
                             </tr>
@@ -84,6 +86,8 @@ const totalDescuentos = (f) => Number(f.desglose?.descuentos?.tardanza || 0) + N
                                 <td class="px-3 py-2 text-right">{{ money(f.honorario) }}</td>
                                 <td class="px-3 py-2 text-right text-gray-600">{{ money(f.sabado) }}</td>
                                 <td class="px-3 py-2 text-right text-gray-600">{{ money(f.domingo) }}</td>
+                                <td class="px-3 py-2 text-right text-gray-600">{{ money(f.horas_extra) }}</td>
+                                <td class="px-3 py-2 text-right text-gray-600">{{ money(f.bono) }}</td>
                                 <td class="px-3 py-2 text-right font-bold text-emerald-700">{{ money(f.neto) }}</td>
                                 <td class="px-3 py-2">
                                     <div class="flex items-center justify-end gap-2">
@@ -92,11 +96,11 @@ const totalDescuentos = (f) => Number(f.desglose?.descuentos?.tardanza || 0) + N
                                     </div>
                                 </td>
                             </tr>
-                            <tr v-if="!hayDatos"><td colspan="9" class="px-4 py-6 text-center text-gray-500">No hay trabajadores por honorarios en esta planilla.</td></tr>
+                            <tr v-if="!hayDatos"><td colspan="11" class="px-4 py-6 text-center text-gray-500">No hay trabajadores por honorarios en esta planilla.</td></tr>
                         </tbody>
                         <tfoot v-if="hayDatos" class="bg-gray-100 font-bold [&_td]:whitespace-nowrap [&_td]:tabular-nums">
                             <tr>
-                                <td class="px-3 py-3" colspan="7">TOTAL NETO</td>
+                                <td class="px-3 py-3" colspan="9">TOTAL NETO</td>
                                 <td class="px-3 py-3 text-right text-emerald-800">{{ money(payroll.total_neto) }}</td>
                                 <td></td>
                             </tr>

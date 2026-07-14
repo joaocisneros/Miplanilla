@@ -27,6 +27,8 @@ class RolePermissionSeeder extends Seeder
             // Boletas / reportes
             'boletas.ver', 'boletas.generar',
             'reportes.ver',
+            // Contratistas (pago por avance de obra)
+            'contratistas.ver', 'contratistas.gestionar', 'contratistas.avance',
         ];
 
         foreach ($permisos as $p) {
@@ -40,10 +42,13 @@ class RolePermissionSeeder extends Seeder
                 'asistencia.ver', 'asistencia.sincronizar', 'asistencia.justificar',
                 'planilla.ver', 'planilla.generar', 'planilla.cerrar',
                 'boletas.ver', 'boletas.generar', 'reportes.ver',
+                'contratistas.ver', 'contratistas.gestionar', 'contratistas.avance',
             ],
             'SUPERVISOR' => [
                 'asistencia.ver', 'asistencia.validar', 'asistencia.justificar',
                 'empleados.ver', 'reportes.ver',
+                // El supervisor registra el avance de obra (no gestiona pagos).
+                'contratistas.ver', 'contratistas.avance',
             ],
             // Auditor externo (SUNAT/SUNAFIL, revisor puntual): solo lectura general.
             'AUDITOR' => [

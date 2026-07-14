@@ -49,6 +49,7 @@ class TurnoController extends Controller
             'cruza_medianoche' => ['boolean'],
             'trabaja_sabado' => ['boolean'],
             'hora_salida_sabado' => ['nullable', 'date_format:H:i'],
+            'trabaja_domingo' => ['boolean'],
             'activo' => ['boolean'],
         ]);
     }

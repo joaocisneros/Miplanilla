@@ -56,9 +56,15 @@ class IngresoAdicionalController extends Controller
                 });
         }
 
+        // Periodo cerrado => pantalla de solo lectura (proteger lo ya validado).
+        $cerrado = $empresaId ? \App\Models\Periodo::where('empresa_id', $empresaId)
+            ->where('anio', $anio)->where('mes', $mes)->where('quincena', $quincena)
+            ->where('estado', 'cerrado')->exists() : false;
+
         return Inertia::render('Adicionales/Index', [
             'empresas' => Empresa::where('activo', true)->orderBy('razon_social')->get(['id', 'razon_social']),
             'filas' => $filas,
+            'cerrado' => $cerrado,
             'filtros' => ['empresa_id' => $empresaId, 'anio' => $anio, 'mes' => $mes, 'quincena' => $quincena],
         ]);
     }
@@ -84,12 +90,22 @@ class IngresoAdicionalController extends Controller
 
         $quincena = $data['quincena'] ?? null;
 
+        // Periodo cerrado: no se puede modificar (protege lo ya validado/pagado).
+        $cerrado = \App\Models\Periodo::where('empresa_id', $data['empresa_id'])
+            ->where('anio', $data['anio'])->where('mes', $data['mes'])->where('quincena', $quincena)
+            ->where('estado', 'cerrado')->exists();
+        if ($cerrado) {
+            return back()->with('error', 'Este periodo está CERRADO: sus montos son historia pagada y no se pueden modificar. Si hay una corrección real, el administrador debe reabrir el periodo primero.');
+        }
+
         DB::transaction(function () use ($data, $quincena, $request) {
             foreach ($data['filas'] as $f) {
                 $horas = (float) ($f['horas'] ?? 0);
                 $minutos = (int) ($f['minutos'] ?? 0);
-                $aprobado = (bool) ($f['aprobado'] ?? false);
                 $montoHoras = (float) ($f['monto_horas'] ?? 0);
+                // Las horas se registran/aprueban en Asistencia; aquí solo van MONTOS.
+                // Si hay monto de H.E., queda aprobado (el motor solo paga aprobados).
+                $aprobado = $montoHoras > 0 ? true : (bool) ($f['aprobado'] ?? false);
                 $sabado = (float) ($f['sabado'] ?? 0);
                 $domingo = (float) ($f['domingo_feriado'] ?? 0);
                 $bono = (float) ($f['bono'] ?? 0);

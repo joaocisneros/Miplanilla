@@ -46,6 +46,7 @@ const q = ref('');
 const fArea = ref('');
 const fCargo = ref('');
 const fEstado = ref('');
+const fModalidad = ref('');
 const areasUnicas = computed(() => [...new Set(props.empleados.map((e) => e.area).filter(Boolean))].sort());
 const cargosUnicos = computed(() => [...new Set(props.empleados.map((e) => e.cargo).filter(Boolean))].sort());
 const empleadosFiltrados = computed(() => props.empleados.filter((e) => {
@@ -57,6 +58,7 @@ const empleadosFiltrados = computed(() => props.empleados.filter((e) => {
     if (fCargo.value && e.cargo !== fCargo.value) return false;
     if (fEstado.value === 'activo' && !e.activo) return false;
     if (fEstado.value === 'cesado' && e.activo) return false;
+    if (fModalidad.value && (e.modalidad || 'planilla') !== fModalidad.value) return false;
     return true;
 }));
 
@@ -67,6 +69,7 @@ function exportar() {
         area: fArea.value || undefined,
         cargo: fCargo.value || undefined,
         estado: fEstado.value || undefined,
+        modalidad: fModalidad.value || undefined,
     });
 }
 
@@ -175,6 +178,14 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                         <option value="">Todos</option>
                         <option value="activo">Activos</option>
                         <option value="cesado">Cesados</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs uppercase text-gray-500">Modalidad</label>
+                    <select v-model="fModalidad" :class="selectCls">
+                        <option value="">Todos</option>
+                        <option value="planilla">👷 Planilla</option>
+                        <option value="honorarios">🧾 Honorarios (RxH)</option>
                     </select>
                 </div>
                 <button type="button" @click="exportar" class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">📥 Exportar Excel</button>

@@ -84,7 +84,9 @@ Route::middleware('auth')->group(function () {
         Route::post('planilla/generar-todas', [PlanillaController::class, 'generarTodas'])->name('planilla.generar-todas');
         Route::post('planilla/periodos/{periodo}/generar', [PlanillaController::class, 'generar'])->name('planilla.generar');
     });
-    Route::post('planilla/{payroll}/cerrar', [PlanillaController::class, 'cerrar'])->middleware('permission:planilla.cerrar')->name('planilla.cerrar');
+    // Cerrar/reabrir: SOLO el administrador (no basta el permiso planilla.cerrar).
+    Route::post('planilla/{payroll}/cerrar', [PlanillaController::class, 'cerrar'])->middleware('role:ADMIN')->name('planilla.cerrar');
+    Route::post('planilla/{payroll}/reabrir', [PlanillaController::class, 'reabrir'])->middleware('role:ADMIN')->name('planilla.reabrir');
 
     // Recibos por Honorarios (RxH): mismo patrón que Planilla (lista de periodos -> detalle por trabajador)
     Route::get('honorarios', [\App\Http\Controllers\HonorarioController::class, 'index'])->middleware('permission:planilla.ver')->name('honorarios.index');
@@ -94,6 +96,30 @@ Route::middleware('auth')->group(function () {
     Route::get('honorarios/{payroll}/excel', [\App\Http\Controllers\HonorarioController::class, 'export'])->middleware('permission:planilla.ver')->name('honorarios.excel');
     Route::get('honorarios/{payroll}/recibos-zip', [\App\Http\Controllers\HonorarioController::class, 'reciboZip'])->middleware('permission:boletas.ver')->name('honorarios.recibos-zip');
     Route::post('honorarios/{payroll}/recalcular', [\App\Http\Controllers\HonorarioController::class, 'recalcular'])->middleware('permission:planilla.generar')->name('honorarios.recalcular');
+    Route::post('honorarios/{payroll}/cerrar', [\App\Http\Controllers\HonorarioController::class, 'cerrar'])->middleware('role:ADMIN')->name('honorarios.cerrar');
+    Route::post('honorarios/{payroll}/reabrir', [\App\Http\Controllers\HonorarioController::class, 'reabrir'])->middleware('role:ADMIN')->name('honorarios.reabrir');
+
+    // Contratistas (pago por avance de obra; separado de planilla/RxH)
+    Route::get('contratistas', [\App\Http\Controllers\ContratistaController::class, 'index'])->middleware('permission:contratistas.ver')->name('contratistas.index');
+    Route::get('contratistas/corte/excel', [\App\Http\Controllers\ContratistaController::class, 'exportCorte'])->middleware('permission:contratistas.ver')->name('contratistas.corte.excel');
+    Route::get('contratistas/export/general', [\App\Http\Controllers\ContratistaController::class, 'exportGeneral'])->middleware('permission:contratistas.ver')->name('contratistas.export.general');
+    Route::post('contratistas/avances', [\App\Http\Controllers\ContratistaController::class, 'storeAvance'])->middleware('permission:contratistas.avance')->name('contratistas.avances.store');
+    Route::middleware('permission:contratistas.gestionar')->group(function () {
+        Route::post('contratistas', [\App\Http\Controllers\ContratistaController::class, 'storeContratista'])->name('contratistas.store');
+        Route::put('contratistas/{contratista}', [\App\Http\Controllers\ContratistaController::class, 'updateContratista'])->name('contratistas.update');
+        Route::delete('contratistas/{contratista}', [\App\Http\Controllers\ContratistaController::class, 'destroyContratista'])->name('contratistas.destroy');
+        Route::post('contratistas/ots', [\App\Http\Controllers\ContratistaController::class, 'storeOt'])->name('contratistas.ots.store');
+        Route::put('contratistas/ots/{ot}', [\App\Http\Controllers\ContratistaController::class, 'updateOt'])->name('contratistas.ots.update');
+        Route::delete('contratistas/ots/{ot}', [\App\Http\Controllers\ContratistaController::class, 'destroyOt'])->name('contratistas.ots.destroy');
+        Route::post('contratistas/codigos', [\App\Http\Controllers\ContratistaController::class, 'storeCodigo'])->name('contratistas.codigos.store');
+        Route::put('contratistas/codigos/{codigo}', [\App\Http\Controllers\ContratistaController::class, 'updateCodigo'])->name('contratistas.codigos.update');
+        Route::delete('contratistas/codigos/{codigo}', [\App\Http\Controllers\ContratistaController::class, 'destroyCodigo'])->name('contratistas.codigos.destroy');
+        Route::post('contratistas/productos', [\App\Http\Controllers\ContratistaController::class, 'storeProducto'])->name('contratistas.productos.store');
+        Route::put('contratistas/productos/{producto}', [\App\Http\Controllers\ContratistaController::class, 'updateProducto'])->name('contratistas.productos.update');
+        Route::delete('contratistas/productos/{producto}', [\App\Http\Controllers\ContratistaController::class, 'destroyProducto'])->name('contratistas.productos.destroy');
+        Route::delete('contratistas/avances/{avance}', [\App\Http\Controllers\ContratistaController::class, 'destroyAvance'])->name('contratistas.avances.destroy');
+        Route::post('contratistas/corte/pagar', [\App\Http\Controllers\ContratistaController::class, 'pagarCorte'])->name('contratistas.corte.pagar');
+    });
 
     // Gratificaciones (Julio / Diciembre)
     Route::get('gratificaciones', [GratificacionController::class, 'index'])->middleware('permission:planilla.ver')->name('gratificaciones.index');
@@ -185,6 +211,12 @@ Route::middleware(['auth', 'role:ADMIN'])->prefix('admin')->name('admin.')->grou
     Route::post('turnos', [TurnoController::class, 'store'])->name('turnos.store');
     Route::put('turnos/{turno}', [TurnoController::class, 'update'])->name('turnos.update');
     Route::delete('turnos/{turno}', [TurnoController::class, 'destroy'])->name('turnos.destroy');
+
+    Route::get('feriados', [\App\Http\Controllers\Admin\FeriadoController::class, 'index'])->name('feriados.index');
+    Route::post('feriados', [\App\Http\Controllers\Admin\FeriadoController::class, 'store'])->name('feriados.store');
+    Route::put('feriados/{feriado}', [\App\Http\Controllers\Admin\FeriadoController::class, 'update'])->name('feriados.update');
+    Route::delete('feriados/{feriado}', [\App\Http\Controllers\Admin\FeriadoController::class, 'destroy'])->name('feriados.destroy');
+    Route::post('feriados/generar', [\App\Http\Controllers\Admin\FeriadoController::class, 'generarAnio'])->name('feriados.generar');
 });
 
 // Parámetros legales, Tasas AFP y Pólizas Vida Ley: ADMIN y CONTADOR (el contador

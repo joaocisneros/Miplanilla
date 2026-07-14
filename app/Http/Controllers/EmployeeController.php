@@ -30,9 +30,10 @@ class EmployeeController extends Controller
             ->get()
             ->map(function ($e) {
                 $c = $e->contratoVigente->first();
-                // Alerta de vencimiento: solo contratos a plazo fijo (con fecha_cese).
+                // Alerta de vencimiento: solo contratos a plazo fijo (con fecha_cese)
+                // de trabajadores ACTIVOS. Un cesado ya no tiene nada que renovar.
                 $diasVencimiento = null;
-                if ($c?->fecha_cese) {
+                if ($e->activo && $c?->fecha_cese) {
                     $diasVencimiento = (int) now()->startOfDay()->diffInDays(\Carbon\Carbon::parse($c->fecha_cese)->startOfDay(), false);
                 }
                 return [
@@ -88,11 +89,13 @@ class EmployeeController extends Controller
         $area = $request->input('area');
         $cargo = $request->input('cargo');
         $estado = $request->input('estado'); // '', 'activo', 'cesado'
+        $modalidad = $request->input('modalidad'); // '', 'planilla', 'honorarios'
 
         $empleados = Employee::with(['empresa', 'contratoVigente.area', 'contratoVigente.cargo', 'contratoVigente.turno'])
             ->when($empresaId, fn ($qq) => $qq->where('empresa_id', $empresaId))
             ->when($estado === 'activo', fn ($qq) => $qq->where('activo', true))
             ->when($estado === 'cesado', fn ($qq) => $qq->where('activo', false))
+            ->when($modalidad, fn ($qq) => $qq->where('modalidad', $modalidad))
             ->when($q !== '', fn ($qq) => $qq->where(fn ($w) => $w
                 ->where('numero_documento', 'like', "%$q%")
                 ->orWhereRaw("CONCAT(apellido_paterno,' ',COALESCE(apellido_materno,''),' ',nombres) like ?", ["%$q%"])))

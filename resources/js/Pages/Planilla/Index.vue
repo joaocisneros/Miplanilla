@@ -11,14 +11,29 @@ const props = defineProps({
 });
 
 const permisos = computed(() => usePage().props.auth?.permissions ?? []);
+const roles = computed(() => usePage().props.auth?.roles ?? []);
 const puedeGenerar = computed(() => permisos.value.includes('planilla.generar'));
-const puedeCerrar = computed(() => permisos.value.includes('planilla.cerrar'));
+// Cerrar y reabrir: SOLO el administrador.
+const puedeCerrar = computed(() => roles.value.includes('ADMIN'));
 
-// Filtro
+// Filtros. Por defecto solo periodos ABIERTOS; los cerrados se ven filtrando.
 const fEmpresa = ref(props.filtros.empresa_id ?? '');
+const fEstado = ref('abiertos');
+const fMes = ref('');
+const fAnio = ref('');
 function filtrar() {
     router.get(route('planilla.index'), { empresa_id: fEmpresa.value || undefined }, { preserveState: true, preserveScroll: true });
 }
+const aniosDisponibles = computed(() => [...new Set(props.periodos.map((p) => p.fecha_inicio?.substring(0, 4)))].filter(Boolean).sort().reverse());
+const periodosVisibles = computed(() =>
+    props.periodos.filter((p) => {
+        if (fEstado.value === 'abiertos' && p.estado === 'cerrado') return false;
+        if (fEstado.value === 'cerrado' && p.estado !== 'cerrado') return false;
+        if (fMes.value && p.fecha_inicio?.substring(5, 7) !== fMes.value) return false;
+        if (fAnio.value && p.fecha_inicio?.substring(0, 4) !== fAnio.value) return false;
+        return true;
+    })
+);
 
 const mostrarForm = ref(false);
 const modoTodas = ref(false);
@@ -61,6 +76,11 @@ function cerrar(payrollId, desc) {
         router.post(route('planilla.cerrar', payrollId), {}, { preserveScroll: true });
     }
 }
+function reabrir(payrollId, desc) {
+    if (confirm(`¿Reabrir la planilla "${desc}"?\n\nVolverá a poder recalcularse. Ojo: si hay trabajadores cesados o tarifas cambiadas después del periodo, un recálculo puede alterar los pagos ya validados.`)) {
+        router.post(route('planilla.reabrir', payrollId), {}, { preserveScroll: true });
+    }
+}
 const money = (v) => 'S/ ' + Number(v ?? 0).toLocaleString('es-PE', { minimumFractionDigits: 2 });
 const inp = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm';
 const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
@@ -90,7 +110,29 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                             <option v-for="e in empresas" :key="e.id" :value="e.id">{{ e.nombre_comercial || e.razon_social }}</option>
                         </select>
                     </div>
-                    <div class="ml-auto self-center text-sm text-gray-500">{{ periodos.length }} periodo(s)</div>
+                    <div>
+                        <label class="block text-xs uppercase text-gray-500">Estado</label>
+                        <select v-model="fEstado" :class="selectCls">
+                            <option value="abiertos">Abiertos</option>
+                            <option value="cerrado">Cerrados</option>
+                            <option value="todos">Todos</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs uppercase text-gray-500">Mes</label>
+                        <select v-model="fMes" :class="selectCls">
+                            <option value="">Todos</option>
+                            <option v-for="(m, i) in meses" :key="i" :value="String(i + 1).padStart(2, '0')">{{ m }}</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs uppercase text-gray-500">Año</label>
+                        <select v-model="fAnio" :class="selectCls">
+                            <option value="">Todos</option>
+                            <option v-for="a in aniosDisponibles" :key="a" :value="a">{{ a }}</option>
+                        </select>
+                    </div>
+                    <div class="ml-auto self-center text-sm text-gray-500">{{ periodosVisibles.length }} periodo(s)</div>
                 </div>
 
                 <div class="overflow-x-auto bg-white shadow-sm sm:rounded-lg">
@@ -99,7 +141,7 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                             <tr><th class="px-4 py-3">Empresa</th><th class="px-4 py-3">Periodo</th><th class="px-4 py-3">Rango</th><th class="px-4 py-3">Estado</th><th class="px-4 py-3">Empleados</th><th class="px-4 py-3">Total neto</th><th class="px-4 py-3 text-right">Acciones</th></tr>
                         </thead>
                         <tbody class="divide-y divide-gray-200">
-                            <tr v-for="p in periodos" :key="p.id" class="hover:bg-gray-50">
+                            <tr v-for="p in periodosVisibles" :key="p.id" class="hover:bg-gray-50">
                                 <td class="px-4 py-3"><span class="rounded-full bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-700">{{ p.empresa ?? '—' }}</span></td>
                                 <td class="px-4 py-3 font-medium text-gray-900">{{ p.descripcion }}</td>
                                 <td class="px-4 py-3 text-gray-600">{{ p.fecha_inicio }} → {{ p.fecha_fin }}</td>
@@ -112,7 +154,8 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                                         <a v-if="p.payroll" :href="route('planilla.detalle-excel', p.payroll.id)" class="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100" title="Descargar planilla detallada en Excel">📥 Excel</a>
                                         <button v-if="puedeGenerar && p.estado !== 'cerrado'" @click="generar(p)" class="inline-flex items-center gap-1 rounded-md bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100">{{ p.payroll ? '↻ Recalcular' : '⚙ Generar' }}</button>
                                         <button v-if="puedeCerrar && p.payroll && p.estado !== 'cerrado'" @click="cerrar(p.payroll.id, p.descripcion)" class="inline-flex items-center gap-1 rounded-md bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100">🔒 Cerrar</button>
-                                        <span v-if="p.estado === 'cerrado'" class="text-xs text-gray-400">Cerrado</span>
+                                        <span v-if="p.estado === 'cerrado'" class="text-xs text-gray-400">🔒 Cerrado</span>
+                                        <button v-if="puedeCerrar && p.payroll && p.estado === 'cerrado'" @click="reabrir(p.payroll.id, p.descripcion)" class="inline-flex items-center gap-1 rounded-md bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100" title="Solo el administrador puede reabrir">🔓 Reabrir</button>
                                     </div>
                                 </td>
                             </tr>

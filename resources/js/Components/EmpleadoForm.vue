@@ -88,6 +88,15 @@ const form = useForm({
 // Sede y área dependen de la empresa elegida
 const esHonorarios = computed(() => form.modalidad === 'honorarios');
 const tipoEsPlazoFijo = computed(() => props.tiposContrato.find((t) => t.value === form.tipo_contrato)?.plazo_fijo ?? false);
+
+// RxH usa contrato CIVIL (locación de servicios); planilla usa los laborales.
+const tiposContratoFiltrados = computed(() => props.tiposContrato.filter((t) =>
+    esHonorarios.value ? t.value === 'locacion_servicios' : t.value !== 'locacion_servicios'
+));
+watch(() => form.modalidad, (m) => {
+    if (m === 'honorarios') form.tipo_contrato = 'locacion_servicios';
+    else if (form.tipo_contrato === 'locacion_servicios') form.tipo_contrato = '';
+}, { immediate: true });
 const sedesFiltradas = computed(() => props.sedes.filter((s) => String(s.empresa_id) === String(form.empresa_id)));
 const areasFiltradas = computed(() => props.areas.filter((a) => String(a.empresa_id) === String(form.empresa_id)));
 
@@ -203,8 +212,9 @@ const inp = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm';
                     <label class="text-sm text-gray-700">Tipo de contrato</label>
                     <select v-model="form.tipo_contrato" :class="inp">
                         <option value="">— Selecciona —</option>
-                        <option v-for="t in tiposContrato" :key="t.value" :value="t.value">{{ t.label }}</option>
+                        <option v-for="t in tiposContratoFiltrados" :key="t.value" :value="t.value">{{ t.label }}</option>
                     </select>
+                    <p v-if="esHonorarios" class="mt-0.5 text-[11px] text-gray-400">RxH: contrato civil, sin vínculo laboral ni beneficios.</p>
                     <p v-if="form.errors.tipo_contrato" class="text-xs text-red-600">{{ form.errors.tipo_contrato }}</p>
                 </div>
                 <div><label class="text-sm text-gray-700">Categoría *</label><select v-model="form.categoria_ocupacional" :class="inp"><option value="empleado">Empleado</option><option value="obrero">Obrero</option></select></div>

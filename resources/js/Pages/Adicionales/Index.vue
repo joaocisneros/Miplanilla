@@ -6,6 +6,7 @@ import { ref, computed, watch } from 'vue';
 const props = defineProps({
     empresas: { type: Array, default: () => [] },
     filas: { type: Array, default: () => [] },
+    cerrado: { type: Boolean, default: false },
     filtros: { type: Object, default: () => ({}) },
 });
 
@@ -52,18 +53,18 @@ const money = (v) => 'S/ ' + Number(v ?? 0).toLocaleString('es-PE', { minimumFra
 const meses = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const anios = [2025, 2026, 2027];
 
-// Lo que realmente se pagará (horas solo si está aprobado)
+// Lo que realmente se pagará (todo aquí son montos directos)
 const totalPagar = computed(() => form.filas.reduce((s, r) =>
-    s + (r.aprobado ? Number(r.monto_horas || 0) : 0)
+    s + Number(r.monto_horas || 0)
       + Number(r.sabado || 0) + Number(r.domingo_feriado || 0) + Number(r.bono || 0), 0));
 const inp = 'w-full rounded-md border-gray-300 shadow-sm text-sm text-right';
 </script>
 
 <template>
-    <Head title="Horas y bonos" />
+    <Head title="Bonos y pagos extra" />
     <AuthenticatedLayout>
         <template #header>
-            <h2 class="text-xl font-semibold text-gray-800">Horas extra y bonos (aprobados por supervisor)</h2>
+            <h2 class="text-xl font-semibold text-gray-800">Bonos y pagos extra (S/)</h2>
         </template>
 
         <div class="p-6 space-y-4">
@@ -101,7 +102,12 @@ const inp = 'w-full rounded-md border-gray-300 shadow-sm text-sm text-right';
                         <button @click="filtrar" class="w-full rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">Cargar</button>
                     </div>
                 </div>
-                <p class="mt-2 text-xs text-gray-500">Las horas extra <b>solo se pagan si están marcadas como aprobadas</b>. El bono se paga siempre que lo registres. Ambos son afectos (pagan AFP/EsSalud/Renta).</p>
+                <p class="mt-2 text-xs text-gray-500">Aquí van <b>montos en soles</b>: sábados, domingos/feriados trabajados, <b>bonos, incentivos y comisiones</b> (ej. comisiones de ventas — usa la Nota para indicar el concepto), y horas extra pagadas como monto fijo. Las <b>horas</b> con su aprobación se registran en <b>Asistencia diaria</b>. Todo lo de esta pantalla entra a la planilla al generarla.</p>
+            </div>
+
+            <!-- Periodo cerrado: solo lectura -->
+            <div v-if="cerrado" class="rounded-lg border border-gray-300 bg-gray-100 p-4 text-sm font-medium text-gray-700">
+                🔒 Este periodo está <b>CERRADO</b>: los montos que ves son historia ya pagada y validada — solo consulta, no se pueden editar. Si hay una corrección real, el administrador debe reabrir el periodo.
             </div>
 
             <!-- Grilla -->
@@ -110,44 +116,38 @@ const inp = 'w-full rounded-md border-gray-300 shadow-sm text-sm text-right';
                     <thead class="bg-gray-50 text-xs uppercase text-gray-500">
                         <tr>
                             <th class="px-3 py-3 text-left">Trabajador</th>
-                            <th class="px-3 py-3 text-right">Horas</th>
-                            <th class="px-3 py-3 text-right">Min.</th>
-                            <th class="px-3 py-3 text-center">¿Aprobado?</th>
-                            <th class="px-3 py-3 text-right">Monto horas (S/)</th>
+                            <th class="px-3 py-3 text-right">H. extra (S/)</th>
                             <th class="px-3 py-3 text-right">Sábados (S/)</th>
                             <th class="px-3 py-3 text-right">Dom./fer. (S/)</th>
-                            <th class="px-3 py-3 text-right">Incentivo/bono (S/)</th>
+                            <th class="px-3 py-3 text-right">Bono / Comisión (S/)</th>
                             <th class="px-3 py-3 text-left">Nota</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
-                        <tr v-for="(r, i) in form.filas" :key="r.employee_id" :class="r.aprobado ? 'bg-green-50/40' : ''">
+                        <tr v-for="(r, i) in form.filas" :key="r.employee_id">
                             <td class="px-3 py-2">
                                 <div class="font-medium text-gray-800">{{ r.trabajador }}</div>
                                 <div class="text-xs text-gray-400">{{ r.dni }} · {{ r.cargo }}</div>
                             </td>
-                            <td class="px-3 py-2 w-20"><input v-model="r.horas" type="number" step="0.5" min="0" :class="inp" /></td>
-                            <td class="px-3 py-2 w-16"><input v-model="r.minutos" type="number" min="0" max="59" :class="inp" /></td>
-                            <td class="px-3 py-2 text-center">
-                                <input v-model="r.aprobado" type="checkbox" class="h-5 w-5 rounded border-gray-300 text-green-600" />
-                            </td>
-                            <td class="px-3 py-2 w-28"><input v-model="r.monto_horas" type="number" step="0.01" min="0" :class="[inp, !r.aprobado ? 'bg-gray-100 text-gray-400' : '']" /></td>
-                            <td class="px-3 py-2 w-28"><input v-model="r.sabado" type="number" step="0.01" min="0" :class="inp" /></td>
-                            <td class="px-3 py-2 w-28"><input v-model="r.domingo_feriado" type="number" step="0.01" min="0" :class="inp" /></td>
-                            <td class="px-3 py-2 w-28"><input v-model="r.bono" type="number" step="0.01" min="0" :class="inp" /></td>
-                            <td class="px-3 py-2"><input v-model="r.nota" type="text" maxlength="255" class="w-full rounded-md border-gray-300 text-sm" /></td>
+                            <td class="px-3 py-2 w-28"><input v-model="r.monto_horas" type="number" step="0.01" min="0" :disabled="cerrado" :class="[inp, cerrado && 'bg-gray-100']" /></td>
+                            <td class="px-3 py-2 w-28"><input v-model="r.sabado" type="number" step="0.01" min="0" :disabled="cerrado" :class="[inp, cerrado && 'bg-gray-100']" /></td>
+                            <td class="px-3 py-2 w-28"><input v-model="r.domingo_feriado" type="number" step="0.01" min="0" :disabled="cerrado" :class="[inp, cerrado && 'bg-gray-100']" /></td>
+                            <td class="px-3 py-2 w-28"><input v-model="r.bono" type="number" step="0.01" min="0" :disabled="cerrado" :class="[inp, cerrado && 'bg-gray-100']" /></td>
+                            <td class="px-3 py-2"><input v-model="r.nota" type="text" maxlength="255" :disabled="cerrado" :class="['w-full rounded-md border-gray-300 text-sm', cerrado && 'bg-gray-100']" /></td>
                         </tr>
                     </tbody>
                     <tfoot class="bg-gray-50">
                         <tr>
-                            <td colspan="8" class="px-3 py-3 text-right font-semibold text-gray-700">Total a pagar (aprobado):</td>
-                            <td class="px-3 py-3 font-bold text-indigo-700">{{ money(totalPagar) }}</td>
+                            <td colspan="4" class="px-3 py-3 text-right font-semibold text-gray-700">Total a pagar:</td>
+                            <td class="px-3 py-3 text-right font-bold text-indigo-700">{{ money(totalPagar) }}</td>
+                            <td></td>
                         </tr>
                     </tfoot>
                 </table>
                 <div class="flex items-center justify-end gap-3 border-t bg-white p-4">
                     <span v-if="form.recentlySuccessful" class="text-sm text-green-600">✓ Guardado</span>
-                    <button @click="guardar" :disabled="form.processing" class="rounded-md bg-green-600 px-5 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50">Guardar adicionales</button>
+                    <button v-if="!cerrado" @click="guardar" :disabled="form.processing" class="rounded-md bg-green-600 px-5 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50">Guardar adicionales</button>
+                    <span v-else class="text-sm text-gray-500">🔒 Periodo cerrado — solo consulta</span>
                 </div>
             </div>
             <div v-else class="rounded-lg bg-white p-8 text-center text-gray-500 shadow-sm">

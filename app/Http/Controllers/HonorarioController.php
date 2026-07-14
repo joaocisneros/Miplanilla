@@ -32,7 +32,10 @@ class HonorarioController extends Controller
             ->get()
             ->map(function ($p) {
                 // Modalidad congelada en el detalle, no la actual del empleado.
-                $dets = $p->detalles->filter(fn ($d) => ($d->modalidad ?? 'planilla') === 'honorarios');
+                // Solo cuentan los que trabajaron (con dias o con pago): un RxH activo
+                // que no trabajo el periodo no aparece ni suma.
+                $dets = $p->detalles->filter(fn ($d) => ($d->modalidad ?? 'planilla') === 'honorarios')
+                    ->filter(fn ($d) => (float) $d->neto != 0.0 || (($d->desglose['asistencia']['dias_trabajados'] ?? 0) > 0));
                 if ($dets->isEmpty()) {
                     return null;
                 }
@@ -104,14 +107,25 @@ class HonorarioController extends Controller
             return back()->with('error', 'No hay trabajadores activos por honorarios en ninguna empresa.');
         }
 
+        $quincena = $data['quincena'] ?? null;
         $generadas = 0;
         foreach ($empresas as $empresa) {
+            // Un mes se maneja por quincenas O mensual, nunca ambos: mezclar
+            // duplica los pagos. Si choca con lo existente, se salta la empresa.
+            $base = Periodo::where('empresa_id', $empresa->id)->where('anio', $data['anio'])->where('mes', $data['mes']);
+            $choca = $quincena === null
+                ? (clone $base)->whereNotNull('quincena')->exists()
+                : (clone $base)->whereNull('quincena')->exists();
+            if ($choca) {
+                continue;
+            }
+
             $periodo = Periodo::firstOrCreate(
                 [
                     'empresa_id' => $empresa->id,
                     'anio' => $data['anio'],
                     'mes' => $data['mes'],
-                    'quincena' => $data['quincena'] ?? null,
+                    'quincena' => $quincena,
                 ],
                 $data
             );
@@ -123,6 +137,10 @@ class HonorarioController extends Controller
             $service->generar($periodo, $request->user()->id);
             $periodo->update(['estado' => 'calculado']);
             $generadas++;
+        }
+
+        if ($generadas === 0) {
+            return back()->with('error', 'No se generó nada: el periodo elegido choca con periodos existentes (ese mes ya se maneja por quincenas o mensual) o está cerrado.');
         }
 
         return back()->with('success', "Honorarios generados/recalculados en {$generadas} empresa(s).");
@@ -143,24 +161,51 @@ class HonorarioController extends Controller
         return back()->with('success', 'Honorarios recalculados.');
     }
 
+    /**
+     * Cierra el periodo desde Honorarios. Nota: cierra TODO el payroll
+     * (planilla + honorarios), porque ambos viven en el mismo periodo.
+     */
+    public function cerrar(Payroll $payroll)
+    {
+        $payroll->update(['estado' => 'cerrado', 'cerrado_at' => now()]);
+        $payroll->periodo->update(['estado' => 'cerrado']);
+
+        return back()->with('success', 'Periodo cerrado. Ya no se puede recalcular.');
+    }
+
+    /** Reabre un periodo cerrado. Solo ADMIN (ver rutas). */
+    public function reabrir(Payroll $payroll)
+    {
+        $payroll->update(['estado' => 'calculado', 'cerrado_at' => null]);
+        $payroll->periodo->update(['estado' => 'calculado']);
+
+        return back()->with('success', 'Periodo reabierto. Se puede volver a recalcular.');
+    }
+
     /** Exporta a Excel el detalle de honorarios de una planilla (payroll) concreta. */
     public function export(Payroll $payroll)
     {
         $payroll->load(['periodo', 'empresa:id,razon_social', 'detalles.employee']);
         $filas = $this->filasDe($payroll);
 
-        $headings = ['N°', 'DNI', 'Apellidos y Nombres', 'Días trab.', 'Faltas', 'Tardanza (min)',
-            'Honorario', 'Sábados', 'Dom/Fer', 'NETO A PAGAR'];
+        // Mismo criterio que el detallado de planilla: el descuento de la tardanza
+        // al costado de sus minutos, y todos los montos que componen el neto visibles.
+        $headings = ['N°', 'DNI', 'Apellidos y Nombres', 'Días trab.', 'Faltas', 'Tardanza (min)', 'Desc. tardanza',
+            'Honorario', 'Sábados', 'Dom/Fer', 'H. extra', 'Bonos', 'Adelantos', 'NETO A PAGAR'];
         $rows = [];
         $i = 1;
         foreach ($filas as $f) {
+            $g = $f['desglose'] ?? [];
             $rows[] = [$i++, $f['dni'], $f['nombre'], $f['dias'], $f['faltas'], $f['tardanza_min'],
-                $f['honorario'], $f['sabado'], $f['domingo'], $f['neto']];
+                round((float) ($g['descuentos']['tardanza'] ?? 0), 2),
+                $f['honorario'], $f['sabado'], $f['domingo'], $f['horas_extra'], $f['bono'],
+                round((float) ($g['descuentos']['adelantos'] ?? 0), 2),
+                $f['neto']];
         }
-        $moneyCols = [7, 8, 9, 10];
+        $moneyCols = [7, 8, 9, 10, 11, 12, 13, 14];
         $nombre = 'honorarios_'.\Illuminate\Support\Str::slug($payroll->empresa->razon_social).'_'.\Illuminate\Support\Str::slug($payroll->periodo->descripcion).'.xlsx';
 
-        return Excel::download(new PlanillaDetalleExport($headings, $rows, $moneyCols, 10, 'D2'), $nombre);
+        return Excel::download(new PlanillaDetalleExport($headings, $rows, $moneyCols, 14, 'D2'), $nombre);
     }
 
     /** Descarga el recibo por honorarios (PDF) de un trabajador. */
@@ -178,7 +223,8 @@ class HonorarioController extends Controller
     {
         $payroll->load(['periodo', 'empresa:id,razon_social', 'detalles.employee']);
 
-        $detalles = $payroll->detalles->filter(fn ($d) => ($d->modalidad ?? 'planilla') === 'honorarios');
+        $detalles = $payroll->detalles->filter(fn ($d) => ($d->modalidad ?? 'planilla') === 'honorarios')
+            ->filter(fn ($d) => (float) $d->neto > 0); // sin pago = sin recibo
 
         if ($detalles->isEmpty()) {
             return back()->with('error', 'No hay recibos por honorarios para descargar en este periodo.');
@@ -220,10 +266,15 @@ class HonorarioController extends Controller
                     'honorario' => round((float) ($ing['remuneracion_devengada'] ?? 0), 2),
                     'sabado' => round((float) ($ing['sabado'] ?? 0), 2),
                     'domingo' => round((float) ($ing['domingo_feriado'] ?? 0), 2),
+                    'horas_extra' => round((float) ($ing['horas_extra'] ?? 0), 2),
+                    'bono' => round((float) ($ing['incentivos'] ?? 0), 2),
                     'neto' => round((float) $d->neto, 2),
                     'desglose' => $g,
                 ];
-            })->sortBy('nombre')->values();
+            })
+            // Sin dias trabajados y sin pago: no trabajo el periodo, no se lista.
+            ->filter(fn ($f) => $f['neto'] > 0 || $f['dias'] > 0)
+            ->sortBy('nombre')->values();
     }
 
     private function generarReciboPdf(PayrollDetail $detalle): \Barryvdh\DomPDF\PDF

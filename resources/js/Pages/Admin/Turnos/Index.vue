@@ -9,12 +9,12 @@ defineProps({ turnos: { type: Array, default: () => [] } });
 
 const mostrar = ref(false);
 const editandoId = ref(null);
-const form = useForm({ nombre: '', hora_entrada: '08:00', hora_salida: '18:00', refrigerio_min: 60, tolerancia_min: 5, cruza_medianoche: false, trabaja_sabado: true, hora_salida_sabado: '', activo: true });
+const form = useForm({ nombre: '', hora_entrada: '08:00', hora_salida: '18:00', refrigerio_min: 60, tolerancia_min: 5, cruza_medianoche: false, trabaja_sabado: true, hora_salida_sabado: '', trabaja_domingo: false, activo: true });
 
-function abrirNuevo() { editandoId.value = null; form.reset(); form.hora_entrada = '08:00'; form.hora_salida = '18:00'; form.refrigerio_min = 60; form.tolerancia_min = 5; form.trabaja_sabado = true; form.hora_salida_sabado = ''; form.activo = true; form.clearErrors(); mostrar.value = true; }
+function abrirNuevo() { editandoId.value = null; form.reset(); form.hora_entrada = '08:00'; form.hora_salida = '18:00'; form.refrigerio_min = 60; form.tolerancia_min = 5; form.trabaja_sabado = true; form.hora_salida_sabado = ''; form.trabaja_domingo = false; form.activo = true; form.clearErrors(); mostrar.value = true; }
 function abrirEditar(t) {
     editandoId.value = t.id;
-    Object.assign(form, { nombre: t.nombre, hora_entrada: t.hora_entrada?.substring(0,5), hora_salida: t.hora_salida?.substring(0,5), refrigerio_min: t.refrigerio_min, tolerancia_min: t.tolerancia_min, cruza_medianoche: !!t.cruza_medianoche, trabaja_sabado: !!t.trabaja_sabado, hora_salida_sabado: t.hora_salida_sabado?.substring(0,5) ?? '', activo: !!t.activo });
+    Object.assign(form, { nombre: t.nombre, hora_entrada: t.hora_entrada?.substring(0,5), hora_salida: t.hora_salida?.substring(0,5), refrigerio_min: t.refrigerio_min, tolerancia_min: t.tolerancia_min, cruza_medianoche: !!t.cruza_medianoche, trabaja_sabado: !!t.trabaja_sabado, hora_salida_sabado: t.hora_salida_sabado?.substring(0,5) ?? '', trabaja_domingo: !!t.trabaja_domingo, activo: !!t.activo });
     form.clearErrors(); mostrar.value = true;
 }
 function guardar() {
@@ -38,7 +38,7 @@ const inp = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm';
         <div class="p-6">
             <div class="overflow-x-auto bg-white shadow-sm sm:rounded-lg">
                 <table class="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500"><tr><th class="px-4 py-3">Nombre</th><th class="px-4 py-3">Entrada</th><th class="px-4 py-3">Salida</th><th class="px-4 py-3">Sábado</th><th class="px-4 py-3">Refrig.</th><th class="px-4 py-3">Tolerancia</th><th class="px-4 py-3">Nocturno</th><th class="px-4 py-3 text-right">Acciones</th></tr></thead>
+                    <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500"><tr><th class="px-4 py-3">Nombre</th><th class="px-4 py-3">Entrada</th><th class="px-4 py-3">Salida</th><th class="px-4 py-3">Sábado</th><th class="px-4 py-3">Domingo</th><th class="px-4 py-3">Refrig.</th><th class="px-4 py-3">Tolerancia</th><th class="px-4 py-3">Nocturno</th><th class="px-4 py-3 text-right">Acciones</th></tr></thead>
                     <tbody class="divide-y divide-gray-200">
                         <tr v-for="t in turnos" :key="t.id">
                             <td class="px-4 py-3 font-medium text-gray-900">{{ t.nombre }}</td>
@@ -48,12 +48,16 @@ const inp = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm';
                                 <span v-if="t.trabaja_sabado" class="text-gray-700">sale {{ t.hora_salida_sabado ? t.hora_salida_sabado.substring(0,5) : t.hora_salida?.substring(0,5) }}</span>
                                 <span v-else class="text-gray-400">no trabaja</span>
                             </td>
+                            <td class="px-4 py-3 text-xs">
+                                <span v-if="t.trabaja_domingo" class="text-gray-700">trabaja</span>
+                                <span v-else class="text-gray-400">no trabaja</span>
+                            </td>
                             <td class="px-4 py-3">{{ t.refrigerio_min }} min</td>
                             <td class="px-4 py-3">{{ t.tolerancia_min }} min</td>
                             <td class="px-4 py-3">{{ t.cruza_medianoche ? 'Sí' : 'No' }}</td>
                             <td class="px-4 py-3 text-right"><div class="inline-flex gap-2"><BotonAccion variante="editar" @click="abrirEditar(t)" /><BotonAccion variante="eliminar" @click="eliminar(t)" /></div></td>
                         </tr>
-                        <tr v-if="turnos.length === 0"><td colspan="8" class="px-4 py-6 text-center text-gray-500">Sin turnos todavía.</td></tr>
+                        <tr v-if="turnos.length === 0"><td colspan="9" class="px-4 py-6 text-center text-gray-500">Sin turnos todavía.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -77,6 +81,12 @@ const inp = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm';
                         <p class="mt-1 text-xs text-amber-700">Ej. operarios: 13:00 (medio día). Se usa solo los sábados; L-V no cambia.</p>
                     </div>
                     <p v-else class="mt-1 text-xs text-gray-500">Los trabajadores de este turno no laboran sábados (ej. administrativos).</p>
+                </div>
+
+                <!-- Domingo (ej. vigilancia con descanso rotativo) -->
+                <div class="rounded-md bg-sky-50 p-3 md:col-span-2">
+                    <div class="flex items-center gap-2"><input v-model="form.trabaja_domingo" type="checkbox" id="td" class="rounded" /><label for="td" class="text-sm font-medium">Trabaja los domingos</label></div>
+                    <p class="mt-1 text-xs text-sky-700">Para turnos de lunes a domingo (ej. vigilancia con relevos): el día de descanso se marca como "Descanso" en la asistencia de cada semana.</p>
                 </div>
 
                 <div class="flex items-center justify-end gap-3 md:col-span-2">

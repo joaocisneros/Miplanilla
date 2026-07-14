@@ -93,6 +93,13 @@ class TiposContrato
                 'plazo_fijo' => false, 'causa' => null, 'max' => null,
                 'nota' => 'Sujeto al régimen laboral especial de la micro y pequeña empresa (Ley MYPE).',
             ],
+            // Para RxH (modalidad honorarios): contrato CIVIL, no laboral.
+            'locacion_servicios' => [
+                'label' => 'Locación de servicios (RxH — honorarios)',
+                'titulo' => 'DE LOCACIÓN DE SERVICIOS',
+                'plazo_fijo' => false, 'causa' => null, 'max' => null,
+                'nota' => 'Contrato civil (art. 1764 del Código Civil): sin vínculo laboral, sin beneficios sociales; el locador emite recibos por honorarios (renta de 4ta categoría).',
+            ],
         ];
     }
 

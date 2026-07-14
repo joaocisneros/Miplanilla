@@ -22,7 +22,10 @@ const detalleForm = useForm({ empresa_id: '', archivo: null });
 
 // Plantilla mensual (formato A) — descarga con filtros e importación
 const descarga = ref({ empresa_id: '', anio: hoy.getFullYear(), mes: hoy.getMonth() + 1 });
-const mensualForm = useForm({ archivo: null });
+// Por defecto se importa SOLO el mes actual: la plantilla viene pre-llenada con
+// el horario de todo el año y sin este candado se registrarian meses no revisados.
+const mensualForm = useForm({ archivo: null, mes: new Date().getMonth() + 1 });
+const nombresMes = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const anios = Array.from({ length: 6 }, (_, i) => 2026 + i); // 2026 en adelante
 
 // Descarga con indicador de progreso (el Excel anual puede tardar ~20-30s).
@@ -191,6 +194,14 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                                     <span class="text-[11px] text-slate-400">.xlsx · .xlsm · .csv</span>
                                     <input type="file" accept=".xlsx,.xlsm,.xls,.csv,.txt" @input="mensualForm.archivo = $event.target.files[0]" class="hidden" />
                                 </label>
+                                <div>
+                                    <label class="text-[11px] font-semibold uppercase text-slate-500">Mes a importar</label>
+                                    <select v-model="mensualForm.mes" class="mt-0.5 block w-full rounded-md border-slate-300 py-1.5 text-sm">
+                                        <option v-for="(m, i) in nombresMes" :key="i" :value="i + 1">Solo {{ m }}</option>
+                                        <option :value="null">⚠ Todo el año (hasta hoy)</option>
+                                    </select>
+                                    <p class="mt-0.5 text-[11px] text-slate-400">Solo se registra el mes elegido; el resto del archivo se ignora.</p>
+                                </div>
                                 <button type="submit" :disabled="mensualForm.processing || !mensualForm.archivo"
                                     class="inline-flex w-full items-center justify-center gap-2 rounded-md bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50">
                                     <span v-if="mensualForm.processing" class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
@@ -198,7 +209,7 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                                 </button>
                             </form>
                             <p v-if="mensualForm.errors.archivo" class="mt-2 text-xs font-medium text-rose-600">{{ mensualForm.errors.archivo }}</p>
-                            <p class="mt-3 text-xs leading-relaxed text-slate-500">Empareja por <b>DNI</b>. Al terminar, revisa en <b>«Asistencia diaria»</b> o <b>«Resumen mensual»</b>.</p>
+                            <p class="mt-3 text-xs leading-relaxed text-slate-500">Empareja por <b>DNI</b>. Al terminar, revisa en <b>«Asistencia diaria»</b> o <b>«Consolidado de asistencia»</b>.</p>
                         </div>
                     </div>
                 </div>
