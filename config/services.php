@@ -14,6 +14,11 @@ return [
     |
     */
 
+    // Consulta RENIEC (DNI -> nombres) via apiperu.dev
+    'apiperu' => [
+        'token' => env('APIPERU_TOKEN'),
+    ],
+
     'postmark' => [
         'key' => env('POSTMARK_API_KEY'),
     ],

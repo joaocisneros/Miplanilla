@@ -46,6 +46,7 @@ Route::middleware('auth')->group(function () {
     // Empleados (RRHH/ADMIN gestionan; SUPERVISOR solo ve)
     Route::get('empleados', [EmployeeController::class, 'index'])->middleware('permission:empleados.ver')->name('empleados.index');
     Route::get('empleados/export', [EmployeeController::class, 'export'])->middleware('permission:empleados.ver')->name('empleados.export');
+    Route::get('empleados/consulta-dni/{dni}', [EmployeeController::class, 'consultaDni'])->middleware('permission:empleados.gestionar')->name('empleados.consultaDni');
     Route::get('empleados/{empleado}/ficha', [EmpleadoDocumentoController::class, 'ficha'])->middleware('permission:empleados.ver')->name('empleados.ficha');
     Route::get('empleados/{empleado}/contrato', [EmpleadoDocumentoController::class, 'contrato'])->middleware('permission:empleados.ver')->name('empleados.contrato');
     Route::get('documentos/{documento}/descargar', [EmpleadoDocumentoController::class, 'descargar'])->middleware('permission:empleados.ver')->name('empleados.documentos.descargar');
@@ -117,6 +118,9 @@ Route::middleware('auth')->group(function () {
         Route::post('contratistas/productos', [\App\Http\Controllers\ContratistaController::class, 'storeProducto'])->name('contratistas.productos.store');
         Route::put('contratistas/productos/{producto}', [\App\Http\Controllers\ContratistaController::class, 'updateProducto'])->name('contratistas.productos.update');
         Route::delete('contratistas/productos/{producto}', [\App\Http\Controllers\ContratistaController::class, 'destroyProducto'])->name('contratistas.productos.destroy');
+        Route::post('contratistas/trabajos', [\App\Http\Controllers\ContratistaController::class, 'storeTrabajo'])->name('contratistas.trabajos.store');
+        Route::put('contratistas/trabajos/{trabajo}', [\App\Http\Controllers\ContratistaController::class, 'updateTrabajo'])->name('contratistas.trabajos.update');
+        Route::delete('contratistas/trabajos/{trabajo}', [\App\Http\Controllers\ContratistaController::class, 'destroyTrabajo'])->name('contratistas.trabajos.destroy');
         Route::delete('contratistas/avances/{avance}', [\App\Http\Controllers\ContratistaController::class, 'destroyAvance'])->name('contratistas.avances.destroy');
         Route::post('contratistas/corte/pagar', [\App\Http\Controllers\ContratistaController::class, 'pagarCorte'])->name('contratistas.corte.pagar');
     });

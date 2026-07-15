@@ -45,7 +45,7 @@ function cambiarEmpresaFiltro() {
 const q = ref('');
 const fArea = ref('');
 const fCargo = ref('');
-const fEstado = ref('');
+const fEstado = ref('activo');
 const fModalidad = ref('');
 const areasUnicas = computed(() => [...new Set(props.empleados.map((e) => e.area).filter(Boolean))].sort());
 const cargosUnicos = computed(() => [...new Set(props.empleados.map((e) => e.cargo).filter(Boolean))].sort());

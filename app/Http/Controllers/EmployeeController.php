@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Exports\PlantillaExport;
+use App\Exports\ListadoExport;
 use App\Models\Area;
 use App\Models\Cargo;
 use App\Models\Empresa;
@@ -18,6 +18,38 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class EmployeeController extends Controller
 {
+    /**
+     * Consulta RENIEC por DNI (apiperu.dev): devuelve los nombres oficiales
+     * para autollenar el formulario y evitar errores de tipeo.
+     */
+    public function consultaDni(string $dni)
+    {
+        if (! preg_match('/^\d{8}$/', $dni)) {
+            return response()->json(['ok' => false, 'mensaje' => 'El DNI debe tener 8 dígitos.'], 422);
+        }
+        $token = config('services.apiperu.token');
+        if (! $token) {
+            return response()->json(['ok' => false, 'mensaje' => 'Falta configurar el token de apiperu.dev (APIPERU_TOKEN en .env).'], 500);
+        }
+        try {
+            $resp = \Illuminate\Support\Facades\Http::withToken($token)->acceptJson()
+                ->timeout(10)->get("https://apiperu.dev/api/dni/{$dni}");
+            $json = $resp->json();
+        } catch (\Throwable $e) {
+            return response()->json(['ok' => false, 'mensaje' => 'No se pudo conectar con RENIEC. Intenta de nuevo.'], 502);
+        }
+        if (! ($json['success'] ?? false) || empty($json['data'])) {
+            return response()->json(['ok' => false, 'mensaje' => $json['message'] ?? 'DNI no encontrado en RENIEC.'], 404);
+        }
+        $d = $json['data'];
+
+        return response()->json(['ok' => true,
+            'apellido_paterno' => mb_strtoupper($d['apellido_paterno'] ?? ''),
+            'apellido_materno' => mb_strtoupper($d['apellido_materno'] ?? ''),
+            'nombres' => mb_strtoupper($d['nombres'] ?? ''),
+        ]);
+    }
+
     public function index(Request $request): Response
     {
         $empresaId = $request->input('empresa_id') ?: null;
@@ -127,7 +159,9 @@ class EmployeeController extends Controller
 
         $headings = ['Empresa', 'DNI', 'Apellidos y nombres', 'Área', 'Cargo', 'Turno', 'Pensión', 'Sueldo básico', 'Estado'];
 
-        return Excel::download(new PlantillaExport($headings, $rows), 'empleados_'.now()->format('Ymd_His').'.xlsx');
+        $titulo = 'Padrón de empleados — '.now()->format('d/m/Y');
+
+        return Excel::download(new ListadoExport($titulo, $headings, $rows, [8]), 'empleados_'.now()->format('Ymd_His').'.xlsx');
     }
 
     public function store(Request $request)

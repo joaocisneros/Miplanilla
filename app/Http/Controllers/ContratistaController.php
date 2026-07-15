@@ -9,6 +9,7 @@ use App\Models\Empresa;
 use App\Models\OrdenTrabajo;
 use App\Models\OtAvance;
 use App\Models\ProductoOt;
+use App\Models\TrabajoOt;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -30,7 +31,7 @@ class ContratistaController extends Controller
             ->orderBy('nombre')
             ->get()
             ->map(function ($c) {
-                $ordenes = $c->ordenes->map(function ($ot) {
+                $ordenes = $c->ordenes->sortBy('codigo', SORT_NATURAL)->values()->map(function ($ot) {
                     $avanceTotal = round((float) $ot->avances->sum('porcentaje'), 2);
                     $montoAvanzado = round((float) $ot->precio * $avanceTotal / 100, 2);
                     $montoPagado = round($ot->avances->where('pagado', true)
@@ -78,6 +79,7 @@ class ContratistaController extends Controller
             'empresas' => Empresa::where('activo', true)->orderBy('razon_social')
                 ->get(['id', 'razon_social', 'nombre_comercial']),
             'productos' => ProductoOt::orderBy('nombre')->get(['id', 'nombre', 'activo']),
+            'trabajos' => TrabajoOt::orderBy('nombre')->get(['id', 'nombre', 'activo']),
             'codigos' => CodigoOt::orderBy('codigo')->get(['id', 'codigo', 'producto', 'activo']),
             'igv' => self::IGV,
         ]);
@@ -91,6 +93,7 @@ class ContratistaController extends Controller
             'telefono' => ['nullable', 'string', 'max:20'],
             'cuenta' => ['nullable', 'string', 'max:30'],
         ]);
+        $data['nombre'] = mb_strtoupper(trim($data['nombre']));
         Contratista::create($data + ['activo' => true]);
 
         return back()->with('success', 'Contratista registrado.');
@@ -105,6 +108,7 @@ class ContratistaController extends Controller
             'cuenta' => ['nullable', 'string', 'max:30'],
             'activo' => ['boolean'],
         ]);
+        $data['nombre'] = mb_strtoupper(trim($data['nombre']));
         $contratista->update($data);
 
         return back()->with('success', 'Contratista actualizado.');
@@ -132,6 +136,11 @@ class ContratistaController extends Controller
             'descripcion' => ['nullable', 'string', 'max:255'],
             'precio' => ['required', 'numeric', 'min:0'],
         ]);
+        if (! empty($data['descripcion'])) {
+            $data['descripcion'] = mb_strtoupper(trim($data['descripcion']));
+            // El catálogo de trabajos se alimenta solo, igual que el de productos.
+            TrabajoOt::firstOrCreate(['nombre' => $data['descripcion']], ['activo' => true]);
+        }
         OrdenTrabajo::create($data);
 
         return back()->with('success', 'Orden de trabajo creada.');
@@ -148,6 +157,10 @@ class ContratistaController extends Controller
             'precio' => ['required', 'numeric', 'min:0'],
             'estado' => ['required', 'in:en_curso,terminada,anulada'],
         ]);
+        if (! empty($data['descripcion'])) {
+            $data['descripcion'] = mb_strtoupper(trim($data['descripcion']));
+            TrabajoOt::firstOrCreate(['nombre' => $data['descripcion']], ['activo' => true]);
+        }
         $ot->update($data);
 
         return back()->with('success', 'Orden de trabajo actualizada.');
@@ -161,6 +174,7 @@ class ContratistaController extends Controller
             'codigo' => ['required', 'string', 'max:30', 'unique:codigos_ot,codigo'],
             'producto' => ['nullable', 'string', 'max:255'],
         ]);
+        $data['codigo'] = mb_strtoupper(trim($data['codigo']));
         if (! empty($data['producto'])) {
             $data['producto'] = mb_strtoupper(trim($data['producto']));
             // El catalogo de productos se alimenta solo desde aqui.
@@ -178,6 +192,7 @@ class ContratistaController extends Controller
             'producto' => ['nullable', 'string', 'max:255'],
             'activo' => ['boolean'],
         ]);
+        $data['codigo'] = mb_strtoupper(trim($data['codigo']));
         if (! empty($data['producto'])) {
             $data['producto'] = mb_strtoupper(trim($data['producto']));
             ProductoOt::firstOrCreate(['nombre' => $data['producto']], ['activo' => true]);
@@ -226,6 +241,37 @@ class ContratistaController extends Controller
         $producto->delete();
 
         return back()->with('success', 'Producto eliminado.');
+    }
+
+    // ---- Catálogo de trabajos/descripciones (se eligen en la OT) ----
+
+    public function storeTrabajo(Request $request)
+    {
+        $data = $request->validate(['nombre' => ['required', 'string', 'max:255', 'unique:trabajos_ot,nombre']]);
+        TrabajoOt::create(['nombre' => mb_strtoupper(trim($data['nombre'])), 'activo' => true]);
+
+        return back()->with('success', 'Trabajo registrado.');
+    }
+
+    public function updateTrabajo(Request $request, TrabajoOt $trabajo)
+    {
+        $data = $request->validate([
+            'nombre' => ['required', 'string', 'max:255', 'unique:trabajos_ot,nombre,'.$trabajo->id],
+            'activo' => ['boolean'],
+        ]);
+        $trabajo->update(['nombre' => mb_strtoupper(trim($data['nombre'])), 'activo' => $data['activo'] ?? true]);
+
+        return back()->with('success', 'Trabajo actualizado.');
+    }
+
+    public function destroyTrabajo(TrabajoOt $trabajo)
+    {
+        if (OrdenTrabajo::where('descripcion', $trabajo->nombre)->exists()) {
+            return back()->with('error', 'No se puede eliminar: hay OTs usando este trabajo. Márcalo como inactivo.');
+        }
+        $trabajo->delete();
+
+        return back()->with('success', 'Trabajo eliminado.');
     }
 
     /** Elimina una OT solo si no tiene avances pagados (deshacer errores). */
@@ -333,7 +379,7 @@ class ContratistaController extends Controller
                     $rows[] = [$c->nombre, $ot->codigo, $ot->producto, $ot->descripcion,
                         (float) $ot->precio, $a->fecha->format('d/m/Y'), (float) $a->porcentaje,
                         round((float) $ot->precio * (float) $a->porcentaje / 100, 2),
-                        $a->pagado ? 'SI' : 'NO', $a->fecha_pago?->format('d/m/Y') ?? '',
+                        $a->pagado ? '✔ PAGADO' : '⏳ FALTA PAGAR', $a->fecha_pago?->format('d/m/Y') ?? '',
                         $avanceTotal.'%', $saldoOt];
                 }
             }
@@ -370,7 +416,7 @@ class ContratistaController extends Controller
                 $subtotal += $monto;
                 $rows[] = [$nombre, $a->orden->codigo, $a->orden->producto, $a->orden->descripcion,
                     (float) $a->orden->precio, (float) $a->porcentaje, $monto,
-                    round($monto * (1 + self::IGV), 2), $a->pagado ? 'SI' : 'NO'];
+                    round($monto * (1 + self::IGV), 2), $a->pagado ? '✔ PAGADO' : '⏳ FALTA PAGAR'];
             }
             $rows[] = ['TOTAL '.$nombre, '', '', '', '', '', round($subtotal, 2),
                 round($subtotal * (1 + self::IGV), 2), ''];

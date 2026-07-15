@@ -1,6 +1,6 @@
 <script setup>
 import { useForm } from '@inertiajs/vue3';
-import { computed, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 const props = defineProps({
     empresas: { type: Array, default: () => [] },
@@ -17,6 +17,35 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['guardado', 'cancelar']);
+
+// Consulta RENIEC: DNI -> nombres oficiales (autollenado sin typos)
+const buscandoDni = ref(false);
+const msgDni = ref('');
+async function buscarDni() {
+    msgDni.value = '';
+    const dni = String(form.numero_documento ?? '').trim();
+    if (!/^\d{8}$/.test(dni)) {
+        msgDni.value = 'Escribe primero un DNI de 8 dígitos.';
+        return;
+    }
+    buscandoDni.value = true;
+    try {
+        const r = await fetch(route('empleados.consultaDni', dni), { headers: { Accept: 'application/json' } });
+        const j = await r.json();
+        if (j.ok) {
+            form.apellido_paterno = j.apellido_paterno;
+            form.apellido_materno = j.apellido_materno;
+            form.nombres = j.nombres;
+            msgDni.value = '✔ Encontrado en RENIEC: ' + j.apellido_paterno + ' ' + j.apellido_materno + ', ' + j.nombres;
+        } else {
+            msgDni.value = j.mensaje ?? 'No se encontró.';
+        }
+    } catch {
+        msgDni.value = 'Error de conexión al consultar.';
+    } finally {
+        buscandoDni.value = false;
+    }
+}
 
 const e = props.empleado ?? {};
 const c = props.contrato ?? {};
@@ -166,7 +195,15 @@ const inp = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm';
                 <div><label class="text-sm text-gray-700">Apellido materno</label><input v-model="form.apellido_materno" :class="[inp, 'uppercase placeholder:normal-case']" /></div>
                 <div><label class="text-sm text-gray-700">Nombres *</label><input v-model="form.nombres" :class="[inp, 'uppercase placeholder:normal-case']" /><p v-if="form.errors.nombres" class="text-xs text-red-600">{{ form.errors.nombres }}</p></div>
                 <div><label class="text-sm text-gray-700">Tipo doc.</label><select v-model="form.tipo_documento" :class="inp"><option>DNI</option><option>CE</option><option>PASAPORTE</option></select></div>
-                <div><label class="text-sm text-gray-700">N° documento *</label><input v-model="form.numero_documento" :class="inp" /><p v-if="form.errors.numero_documento" class="text-xs text-red-600">{{ form.errors.numero_documento }}</p></div>
+                <div>
+                    <label class="text-sm text-gray-700">N° documento *</label>
+                    <div class="flex items-center gap-2">
+                        <input v-model="form.numero_documento" :class="inp" />
+                        <button v-if="form.tipo_documento === 'DNI'" type="button" @click="buscarDni" :disabled="buscandoDni" class="whitespace-nowrap rounded-md bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50" title="Busca los nombres oficiales en RENIEC">{{ buscandoDni ? 'Buscando…' : '🔍 RENIEC' }}</button>
+                    </div>
+                    <p v-if="msgDni" class="mt-0.5 text-xs" :class="msgDni.startsWith('✔') ? 'text-green-600' : 'text-amber-600'">{{ msgDni }}</p>
+                    <p v-if="form.errors.numero_documento" class="text-xs text-red-600">{{ form.errors.numero_documento }}</p>
+                </div>
                 <div><label class="text-sm text-gray-700">Fecha nacimiento</label><input v-model="form.fecha_nacimiento" type="date" :class="inp" /></div>
                 <div><label class="text-sm text-gray-700">Género</label><select v-model="form.genero" :class="inp"><option value="">—</option><option value="M">Masculino</option><option value="F">Femenino</option></select></div>
                 <div><label class="text-sm text-gray-700">Estado civil</label><input v-model="form.estado_civil" :class="inp" /></div>

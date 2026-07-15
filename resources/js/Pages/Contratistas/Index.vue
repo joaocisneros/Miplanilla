@@ -8,6 +8,7 @@ const props = defineProps({
     contratistas: { type: Array, default: () => [] },
     empresas: { type: Array, default: () => [] },
     productos: { type: Array, default: () => [] },
+    trabajos: { type: Array, default: () => [] },
     codigos: { type: Array, default: () => [] },
     igv: { type: Number, default: 0.18 },
 });
@@ -58,6 +59,7 @@ function irAOt(r) {
 }
 
 const money = (v) => 'S/ ' + Number(v ?? 0).toLocaleString('es-PE', { minimumFractionDigits: 2 });
+const fdmy = (s) => (s ? String(s).split('-').reverse().join('/') : '');
 const inp = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm';
 
 // ---- Corte de pago: se elige MES + QUINCENA (las fechas salen solas) ----
@@ -80,32 +82,46 @@ const enRango = (f) => f.fecha >= desde.value && f.fecha <= hasta.value;
 const corte = computed(() => props.contratistas
     .filter((c) => !cContratista.value || c.id === cContratista.value)
     .map((c) => {
-        // agrupa por OT: suma los avances del periodo elegido
+        // agrupa por OT: solo los avances del periodo AÚN NO PAGADOS suman al
+        // corte; lo ya pagado se muestra aparte como referencia (nunca se repite).
         const filas = [];
+        let yaPagado = 0;
         for (const ot of c.ordenes) {
             const enPeriodo = ot.avances.filter(enRango);
             if (!enPeriodo.length) continue;
+            const porPagar = enPeriodo.filter((a) => !a.pagado);
+            yaPagado += enPeriodo.filter((a) => a.pagado).reduce((s, a) => s + a.monto, 0);
+            if (!porPagar.length) continue;
             filas.push({
                 ot: ot.codigo,
                 producto: ot.producto,
                 descripcion: ot.descripcion,
-                pct: Math.round(enPeriodo.reduce((s, a) => s + a.porcentaje, 0) * 100) / 100,
-                monto: enPeriodo.reduce((s, a) => s + a.monto, 0),
-                pagado: enPeriodo.every((a) => a.pagado),
+                pct: Math.round(porPagar.reduce((s, a) => s + a.porcentaje, 0) * 100) / 100,
+                monto: porPagar.reduce((s, a) => s + a.monto, 0),
+                pagado: false,
             });
         }
         const total = filas.reduce((s, f) => s + f.monto, 0);
-        const pendiente = filas.some((f) => !f.pagado);
-        return { id: c.id, nombre: c.nombre, cuenta: c.cuenta, filas, total, facturar: total * (1 + props.igv), pendiente };
+        const pendiente = filas.length > 0;
+        return { id: c.id, nombre: c.nombre, cuenta: c.cuenta, filas, total, yaPagado: Math.round(yaPagado * 100) / 100, facturar: total * (1 + props.igv), pendiente };
     })
-    .filter((c) => c.filas.length > 0));
+    .filter((c) => c.filas.length > 0 || c.yaPagado > 0));
 
 const corteTotal = computed(() => corte.value.reduce((s, c) => s + c.total, 0));
 
+// Confirmación de pago en modal (resumen completo antes de registrar)
+const mostrarPago = ref(false);
+const pagoSel = ref(null);
+const pagoEnviando = ref(false);
 function pagarContratista(c) {
-    if (confirm(`¿Registrar el PAGO a ${c.nombre}?\n\nPeriodo: ${desde.value} al ${hasta.value}\nMonto: ${money(c.total)}\nFactura (con IGV): ${money(c.facturar)}`)) {
-        router.post(route('contratistas.corte.pagar'), { desde: desde.value, hasta: hasta.value, contratista_id: c.id }, { preserveScroll: true });
-    }
+    pagoSel.value = c;
+    mostrarPago.value = true;
+}
+function confirmarPago() {
+    pagoEnviando.value = true;
+    router.post(route('contratistas.corte.pagar'),
+        { desde: desde.value, hasta: hasta.value, contratista_id: pagoSel.value.id },
+        { preserveScroll: true, onFinish: () => { pagoEnviando.value = false; mostrarPago.value = false; } });
 }
 
 // ---- Modales ----
@@ -134,9 +150,9 @@ function eliminarContratista() {
 const mostrarOt = ref(false);
 const fO = useForm({ id: null, contratista_id: '', empresa_id: '', codigo: '', producto: '', descripcion: '', precio: '', estado: 'en_curso' });
 
-// Productos: catalogo propio (caja de opciones). Trabajos: autocompletar de lo usado.
+// Productos y trabajos: catálogos propios (cajas de opciones).
 const productosActivos = computed(() => props.productos.filter((p) => p.activo));
-const trabajos = computed(() => [...new Set(props.contratistas.flatMap((c) => c.ordenes.map((o) => o.descripcion)).filter(Boolean))].sort());
+const trabajosActivos = computed(() => props.trabajos.filter((t) => t.activo));
 
 // Catalogo de codigos OT (unidades del taller): se registran una vez en la
 // pestaña Catalogos y en la OT solo se seleccionan. Al elegir el codigo, el
@@ -202,6 +218,28 @@ function editarProducto(p) {
 function eliminarProducto(p) {
     if (confirm(`¿Eliminar el producto "${p.nombre}"?`)) {
         router.delete(route('contratistas.productos.destroy', p.id), { preserveScroll: true });
+    }
+}
+
+// CRUD del catalogo de trabajos/descripciones
+const buscaTrab = ref('');
+const trabajosFiltrados = computed(() => {
+    const q = buscaTrab.value.trim().toUpperCase();
+    return props.trabajos.filter((t) => !q || t.nombre.toUpperCase().includes(q));
+});
+const fT = useForm({ id: null, nombre: '', activo: true });
+function guardarTrabajo() {
+    const opts = { preserveScroll: true, onSuccess: () => fT.reset() };
+    fT.id ? fT.put(route('contratistas.trabajos.update', fT.id), opts) : fT.post(route('contratistas.trabajos.store'), opts);
+}
+function editarTrabajo(t) {
+    fT.id = t.id;
+    fT.nombre = t.nombre;
+    fT.activo = t.activo;
+}
+function eliminarTrabajo(t) {
+    if (confirm(`¿Eliminar el trabajo "${t.nombre}"?`)) {
+        router.delete(route('contratistas.trabajos.destroy', t.id), { preserveScroll: true });
     }
 }
 
@@ -302,7 +340,7 @@ function estadoOt(ot) {
                 <div class="flex gap-2">
                     <button @click="tab = 'ots'" :class="tab === 'ots' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'" class="rounded-md px-4 py-2 text-sm font-semibold shadow-sm">📋 Órdenes de trabajo</button>
                     <button @click="tab = 'corte'" :class="tab === 'corte' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'" class="rounded-md px-4 py-2 text-sm font-semibold shadow-sm">💵 Corte de pago</button>
-                    <button v-if="puedeGestionar" @click="tab = 'productos'" :class="tab === 'productos' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'" class="rounded-md px-4 py-2 text-sm font-semibold shadow-sm">📇 Catálogo de OTs</button>
+                    <button v-if="puedeGestionar" @click="tab = 'productos'" :class="tab === 'productos' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'" class="rounded-md px-4 py-2 text-sm font-semibold shadow-sm">🏷️ Catálogos</button>
                 </div>
 
                 <!-- ===== Pestaña: OTs por contratista (maestro-detalle) ===== -->
@@ -393,7 +431,7 @@ function estadoOt(ot) {
                                                     </div>
                                                     <span class="text-xs font-semibold text-gray-600">{{ ot.avance_total }}%</span>
                                                 </div>
-                                                <div class="mt-0.5 text-[11px] text-gray-400">avanzado {{ money(ot.monto_avanzado) }} · pagado {{ money(ot.monto_pagado) }}</div>
+                                                <div class="mt-0.5 text-[11px] text-gray-400">avanzado {{ money(ot.monto_avanzado) }} · <span :class="ot.monto_pagado > 0 ? 'font-semibold text-green-600' : ''">pagado {{ money(ot.monto_pagado) }}</span></div>
                                             </td>
                                             <td class="whitespace-nowrap px-4 py-2 text-right font-semibold" :class="ot.saldo_por_pagar > 0 ? 'text-red-600' : 'text-gray-400'">{{ money(ot.saldo_por_pagar) }}</td>
                                             <td class="px-4 py-2">
@@ -458,6 +496,10 @@ function estadoOt(ot) {
                                 <div v-if="c.cuenta" class="text-xs text-gray-500">Cta. {{ c.cuenta }}</div>
                             </div>
                             <div class="ml-auto flex items-center gap-4">
+                                <div v-if="c.yaPagado > 0" class="text-right">
+                                    <div class="text-[10px] uppercase text-gray-500">Ya pagado (periodo)</div>
+                                    <div class="text-lg font-semibold text-green-700">{{ money(c.yaPagado) }}</div>
+                                </div>
                                 <div class="text-right">
                                     <div class="text-[10px] uppercase text-gray-500">Se le paga</div>
                                     <div class="text-lg font-bold text-gray-900">{{ money(c.total) }}</div>
@@ -466,7 +508,7 @@ function estadoOt(ot) {
                                     <div class="text-[10px] uppercase text-gray-500">Su factura (con IGV)</div>
                                     <div class="text-lg font-semibold text-gray-500">{{ money(c.facturar) }}</div>
                                 </div>
-                                <span v-if="!c.pendiente" class="rounded-full bg-green-100 px-3 py-1.5 text-xs font-semibold text-green-800">✔ Pagado</span>
+                                <span v-if="!c.pendiente" class="rounded-full bg-green-100 px-3 py-1.5 text-xs font-semibold text-green-800">✔ Todo pagado</span>
                                 <button v-else-if="puedeGestionar" @click="pagarContratista(c)" class="rounded-md bg-green-700 px-4 py-2 text-xs font-semibold text-white hover:bg-green-800">💵 Registrar pago</button>
                             </div>
                         </div>
@@ -493,11 +535,11 @@ function estadoOt(ot) {
                     </div>
                 </div>
 
-                <!-- ===== Pestaña: Catálogo de OTs (código + producto en un solo registro) ===== -->
-                <div v-if="tab === 'productos'" class="mx-auto max-w-3xl">
+                <!-- ===== Pestaña: Catálogos (unidades a la izquierda, trabajos a la derecha) ===== -->
+                <div v-if="tab === 'productos'" class="mx-auto grid max-w-7xl grid-cols-1 items-start gap-6 xl:grid-cols-2">
                     <div class="overflow-hidden rounded-lg bg-white shadow-sm">
                         <div class="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3">
-                            <h3 class="text-sm font-bold text-gray-800">📇 Catálogo de OTs <span class="ml-1 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">{{ codigos.length }}</span></h3>
+                            <h3 class="text-sm font-bold text-gray-800">📇 Unidades (código + producto) <span class="ml-1 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">{{ codigos.length }}</span></h3>
                             <div class="flex items-center gap-2">
                                 <input v-model="buscaCod" type="text" placeholder="🔍 Buscar código o producto..." class="w-56 rounded-md border-gray-300 py-1.5 text-xs" />
                                 <button @click="abrirCodigo()" class="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700">+ Agregar</button>
@@ -518,6 +560,38 @@ function estadoOt(ot) {
                                         </td>
                                     </tr>
                                     <tr v-if="codigosFiltrados.length === 0"><td colspan="3" class="px-4 py-6 text-center text-gray-400">{{ buscaCod ? 'Sin resultados para la búsqueda.' : 'Sin códigos registrados.' }}</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Catálogo de trabajos / descripciones -->
+                    <div class="overflow-hidden rounded-lg bg-white shadow-sm">
+                        <div class="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3">
+                            <h3 class="text-sm font-bold text-gray-800">🛠 Trabajos / descripciones <span class="ml-1 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">{{ trabajos.length }}</span></h3>
+                            <input v-model="buscaTrab" type="text" placeholder="🔍 Buscar trabajo..." class="w-56 rounded-md border-gray-300 py-1.5 text-xs" />
+                        </div>
+                        <form @submit.prevent="guardarTrabajo" class="flex items-center gap-2 border-b border-gray-100 bg-gray-50/60 px-4 py-2.5">
+                            <input v-model="fT.nombre" type="text" :placeholder="fT.id ? 'Editando trabajo...' : 'Nuevo trabajo (ej. ARMADO DE CHASIS)'" class="w-full rounded-md border-gray-300 py-1.5 text-xs" />
+                            <label v-if="fT.id" class="flex items-center gap-1 whitespace-nowrap text-xs text-gray-600"><input v-model="fT.activo" type="checkbox" class="rounded border-gray-300" /> Activo</label>
+                            <button type="submit" :disabled="fT.processing || !fT.nombre.trim()" class="whitespace-nowrap rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50">{{ fT.id ? 'Guardar' : '+ Agregar' }}</button>
+                            <button v-if="fT.id" type="button" @click="fT.reset()" class="whitespace-nowrap rounded-md bg-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700">Cancelar</button>
+                        </form>
+                        <p v-if="fT.errors.nombre" class="px-4 pt-1 text-xs text-red-600">{{ fT.errors.nombre }}</p>
+                        <div class="max-h-[24rem] overflow-y-auto">
+                            <table class="min-w-full text-sm">
+                                <thead class="sticky top-0 bg-gray-50 text-left text-xs uppercase text-gray-500">
+                                    <tr><th class="px-4 py-2">Trabajo</th><th class="px-4 py-2 text-right">Acciones</th></tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100">
+                                    <tr v-for="t in trabajosFiltrados" :key="t.id" class="hover:bg-indigo-50/40" :class="!t.activo ? 'opacity-45' : ''">
+                                        <td class="px-4 py-1.5 text-gray-800">{{ t.nombre }} <span v-if="!t.activo" class="ml-1 text-[10px] text-gray-500">(inactivo)</span></td>
+                                        <td class="whitespace-nowrap px-4 py-1.5 text-right">
+                                            <button @click="editarTrabajo(t)" class="rounded px-1.5 py-0.5 text-xs text-gray-500 hover:bg-gray-100" title="Editar">✏️</button>
+                                            <button @click="eliminarTrabajo(t)" class="rounded px-1.5 py-0.5 text-xs text-gray-500 hover:bg-red-50" title="Eliminar">🗑</button>
+                                        </td>
+                                    </tr>
+                                    <tr v-if="trabajosFiltrados.length === 0"><td colspan="2" class="px-4 py-6 text-center text-gray-400">{{ buscaTrab ? 'Sin resultados para la búsqueda.' : 'Sin trabajos registrados.' }}</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -551,41 +625,36 @@ function estadoOt(ot) {
         <!-- Modal OT -->
         <CrudModal :show="mostrarOt" :titulo="fO.id ? 'Editar orden de trabajo' : 'Nueva orden de trabajo'" @close="mostrarOt = false">
             <form @submit.prevent="guardarOt" class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                    <label class="text-sm text-gray-700">Código OT *</label>
+                <div class="md:col-span-2">
+                    <label class="text-sm text-gray-700">1. Unidad (código — producto) *</label>
                     <select v-model="fO.codigo" :class="inp">
-                        <option value="">— Selecciona —</option>
-                        <option v-if="fO.codigo && !codigosActivos.some((c) => c.codigo === fO.codigo)" :value="fO.codigo">{{ fO.codigo }}</option>
+                        <option value="">— Selecciona la unidad del taller —</option>
+                        <option v-if="fO.codigo && !codigosActivos.some((c) => c.codigo === fO.codigo)" :value="fO.codigo">{{ fO.codigo }}{{ fO.producto ? ' — ' + fO.producto : '' }}</option>
                         <option v-for="c in codigosActivos" :key="c.id" :value="c.codigo">{{ c.codigo }}{{ c.producto ? ' — ' + c.producto : '' }}</option>
                     </select>
-                    <p class="mt-0.5 text-[11px] text-gray-400">¿Falta el código? Regístralo en la pestaña 🏷️ Catálogos.</p>
+                    <p class="mt-0.5 text-[11px] text-gray-400">¿Falta la unidad? Regístrala en la pestaña 🏷️ Catálogos.</p>
                     <p v-if="fO.errors.codigo" class="text-xs text-red-600">{{ fO.errors.codigo }}</p>
                 </div>
-                <div>
-                    <label class="text-sm text-gray-700">Precio pactado (S/) *</label>
-                    <input v-model="fO.precio" type="number" step="0.01" min="0" :class="inp" />
-                    <p v-if="fO.errors.precio" class="text-xs text-red-600">{{ fO.errors.precio }}</p>
-                </div>
-                <div>
-                    <label class="text-sm text-gray-700">Producto</label>
-                    <select v-model="fO.producto" :class="inp">
+                <div class="md:col-span-2">
+                    <label class="text-sm text-gray-700">2. Trabajo a realizar</label>
+                    <select v-model="fO.descripcion" :class="inp">
                         <option value="">—</option>
-                        <option v-if="fO.producto && !productosActivos.some((p) => p.nombre === fO.producto)" :value="fO.producto">{{ fO.producto }}</option>
-                        <option v-for="p in productosActivos" :key="p.id" :value="p.nombre">{{ p.nombre }}</option>
+                        <option v-if="fO.descripcion && !trabajosActivos.some((t) => t.nombre === fO.descripcion)" :value="fO.descripcion">{{ fO.descripcion }}</option>
+                        <option v-for="t in trabajosActivos" :key="t.id" :value="t.nombre">{{ t.nombre }}</option>
                     </select>
                     <p class="mt-0.5 text-[11px] text-gray-400">¿Falta uno? Regístralo en la pestaña 🏷️ Catálogos.</p>
                 </div>
                 <div>
-                    <label class="text-sm text-gray-700">Empresa (a quién factura)</label>
+                    <label class="text-sm text-gray-700">3. Precio pactado (S/) *</label>
+                    <input v-model="fO.precio" type="number" step="0.01" min="0" :class="inp" />
+                    <p v-if="fO.errors.precio" class="text-xs text-red-600">{{ fO.errors.precio }}</p>
+                </div>
+                <div>
+                    <label class="text-sm text-gray-700">4. Empresa (a quién factura)</label>
                     <select v-model="fO.empresa_id" :class="inp">
                         <option value="">—</option>
                         <option v-for="e in empresas" :key="e.id" :value="e.id">{{ e.nombre_comercial || e.razon_social }}</option>
                     </select>
-                </div>
-                <div class="md:col-span-2">
-                    <label class="text-sm text-gray-700">Trabajo / descripción</label>
-                    <input v-model="fO.descripcion" type="text" list="lista-trabajos" placeholder="Armado de casco (compuerta y montaje al chasis)" :class="inp" />
-                    <datalist id="lista-trabajos"><option v-for="t in trabajos" :key="t" :value="t" /></datalist>
                 </div>
                 <div v-if="fO.id">
                     <label class="text-sm text-gray-700">Estado</label>
@@ -650,7 +719,10 @@ function estadoOt(ot) {
                     </div>
                     <div>
                         <label class="text-sm text-gray-700">% avanzado *</label>
-                        <input v-model="fA.porcentaje" type="number" step="0.01" min="0.01" :max="100 - (otSel?.avance_total ?? 0)" :class="inp" />
+                        <div class="flex items-center gap-2">
+                            <input v-model="fA.porcentaje" type="number" step="0.01" min="0.01" :max="100 - (otSel?.avance_total ?? 0)" :class="inp" />
+                            <button v-if="(otSel?.avance_total ?? 0) < 100" type="button" @click="fA.porcentaje = Math.round((100 - (otSel?.avance_total ?? 0)) * 100) / 100" class="whitespace-nowrap rounded-md bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100" :title="'Completa el ' + (100 - (otSel?.avance_total ?? 0)) + '% restante para terminar la OT'">✔ Completar ({{ Math.round((100 - (otSel?.avance_total ?? 0)) * 100) / 100 }}%)</button>
+                        </div>
                         <p v-if="fA.errors.porcentaje" class="text-xs text-red-600">{{ fA.errors.porcentaje }}</p>
                     </div>
                 </div>
@@ -672,12 +744,12 @@ function estadoOt(ot) {
                     </thead>
                     <tbody class="divide-y divide-gray-100">
                         <tr v-for="a in otSel?.avances ?? []" :key="a.id">
-                            <td class="py-1.5">{{ a.fecha }} <span v-if="a.nota" class="text-xs text-gray-400">({{ a.nota }})</span></td>
+                            <td class="py-1.5">{{ fdmy(a.fecha) }} <span v-if="a.nota" class="text-xs text-gray-400">({{ a.nota }})</span></td>
                             <td class="py-1.5 text-right tabular-nums">{{ a.porcentaje }}%</td>
                             <td class="py-1.5 text-right tabular-nums">{{ money(a.monto) }}</td>
                             <td class="py-1.5 text-center">
-                                <span v-if="a.pagado" class="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-800" :title="'Pagado el ' + a.fecha_pago">✔ {{ a.fecha_pago }}</span>
-                                <span v-else class="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">pendiente</span>
+                                <span v-if="a.pagado" class="whitespace-nowrap rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800">✔ pagado el {{ fdmy(a.fecha_pago) }}</span>
+                                <span v-else class="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">⏳ pendiente</span>
                             </td>
                             <td class="py-1.5 text-right">
                                 <button v-if="puedeGestionar && !a.pagado" @click="eliminarAvance(a)" class="text-xs text-red-600 hover:underline">eliminar</button>
@@ -688,6 +760,42 @@ function estadoOt(ot) {
                 </table>
                 <div class="flex justify-end border-t pt-3">
                     <button @click="mostrarDetalle = false" class="rounded-md bg-gray-200 px-4 py-2 text-sm font-semibold text-gray-700">Cerrar</button>
+                </div>
+            </div>
+        </CrudModal>
+
+        <!-- Modal de confirmación de pago (resumen profesional del corte) -->
+        <CrudModal :show="mostrarPago" titulo="💵 Confirmar pago al contratista" @close="mostrarPago = false">
+            <div v-if="pagoSel" class="space-y-4 text-sm">
+                <div class="rounded-lg bg-gray-50 p-4">
+                    <div class="text-base font-bold text-gray-900">{{ pagoSel.nombre }}</div>
+                    <div class="mt-1 grid grid-cols-1 gap-1 text-xs text-gray-600 sm:grid-cols-2">
+                        <div>📅 Periodo: <span class="font-semibold text-gray-800">{{ desde }} al {{ hasta }}</span></div>
+                        <div v-if="pagoSel.cuenta">🏦 Cuenta: <span class="font-semibold text-gray-800">{{ pagoSel.cuenta }}</span></div>
+                    </div>
+                </div>
+                <table class="w-full">
+                    <thead class="text-left text-xs uppercase text-gray-500">
+                        <tr><th class="py-1">OT</th><th class="py-1">Trabajo</th><th class="py-1 text-right">Avanzó</th><th class="py-1 text-right">Monto</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        <tr v-for="f in pagoSel.filas" :key="f.ot">
+                            <td class="py-1.5 font-semibold text-gray-800">{{ f.ot }}</td>
+                            <td class="py-1.5 text-xs text-gray-600">{{ f.producto }}<span v-if="f.descripcion" class="text-gray-400"> — {{ f.descripcion }}</span></td>
+                            <td class="py-1.5 text-right tabular-nums">{{ f.pct }}%</td>
+                            <td class="py-1.5 text-right tabular-nums">{{ money(f.monto) }}</td>
+                        </tr>
+                    </tbody>
+                    <tfoot class="border-t-2 border-gray-200 text-sm">
+                        <tr><td colspan="3" class="py-1.5 text-right font-semibold text-gray-700">Se le paga</td><td class="py-1.5 text-right font-bold tabular-nums">{{ money(pagoSel.total) }}</td></tr>
+                        <tr class="text-xs text-gray-500"><td colspan="3" class="py-1 text-right">IGV (18%)</td><td class="py-1 text-right tabular-nums">{{ money(pagoSel.facturar - pagoSel.total) }}</td></tr>
+                        <tr><td colspan="3" class="py-1.5 text-right font-semibold text-emerald-700">Su factura debe ser (con IGV)</td><td class="py-1.5 text-right font-bold tabular-nums text-emerald-700">{{ money(pagoSel.facturar) }}</td></tr>
+                    </tfoot>
+                </table>
+                <p class="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">Al confirmar, estos avances quedan marcados como pagados y ya no aparecerán en cortes futuros.</p>
+                <div class="flex justify-end gap-3 border-t pt-3">
+                    <button @click="mostrarPago = false" class="rounded-md bg-gray-200 px-4 py-2 text-sm font-semibold text-gray-700">Cancelar</button>
+                    <button @click="confirmarPago" :disabled="pagoEnviando" class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">✔ Confirmar pago</button>
                 </div>
             </div>
         </CrudModal>
