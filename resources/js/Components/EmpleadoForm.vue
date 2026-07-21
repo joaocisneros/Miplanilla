@@ -276,11 +276,23 @@ const inp = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm';
         <section v-if="!esHonorarios" class="bg-white p-6 shadow-sm sm:rounded-lg">
             <h3 class="mb-4 border-b pb-2 text-lg font-medium text-gray-900">5. Pensiones y seguros</h3>
             <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <div><label class="text-sm text-gray-700">Sistema de pensiones</label><select v-model="form.sistema_pensiones" :class="inp"><option value="">—</option><option value="AFP">AFP</option><option value="ONP">ONP</option></select></div>
+                <div><label class="text-sm text-gray-700">Sistema de pensiones</label><select v-model="form.sistema_pensiones" :class="inp"><option value="">—</option><option value="AFP">AFP</option><option value="ONP">ONP</option><option value="JUBILADO">JUBILADO (ya se retiró, sin descuento)</option></select></div>
                 <div v-if="form.sistema_pensiones === 'AFP'"><label class="text-sm text-gray-700">AFP *</label><select v-model="form.afp" :class="inp"><option value="">—</option><option>INTEGRA</option><option>PRIMA</option><option>PROFUTURO</option><option>HABITAT</option></select><p v-if="form.errors.afp" class="text-xs text-red-600">{{ form.errors.afp }}</p></div>
                 <div v-if="form.sistema_pensiones === 'AFP'"><label class="text-sm text-gray-700">Tipo comisión *</label><select v-model="form.tipo_afp" :class="inp"><option value="">—</option><option value="mixta">Mixta</option><option value="sueldo">Flujo (sueldo)</option></select><p v-if="form.errors.tipo_afp" class="text-xs text-red-600">{{ form.errors.tipo_afp }}</p></div>
                 <div v-if="form.sistema_pensiones === 'AFP'"><label class="text-sm text-gray-700">Código AFP (CUSPP)</label><input v-model="form.codigo_afp" :class="inp" /></div>
-                <div><label class="text-sm text-gray-700">Fecha afiliación pensión</label><input v-model="form.fecha_afiliacion_pension" type="date" :class="inp" /></div>
+                <div v-if="form.sistema_pensiones === 'JUBILADO'" class="md:col-span-2">
+                    <label class="text-sm text-gray-700">¿A qué correspondía / corresponde? (referencia, no se descuenta)</label>
+                    <select v-model="form.afp" :class="inp">
+                        <option value="">—</option>
+                        <option value="ONP">ONP</option>
+                        <option value="INTEGRA">AFP Integra</option>
+                        <option value="PRIMA">AFP Prima</option>
+                        <option value="PROFUTURO">AFP Profuturo</option>
+                        <option value="HABITAT">AFP Habitat</option>
+                    </select>
+                    <p class="mt-0.5 text-[11px] text-gray-400">Solo informativo — no se le descuenta nada aunque se elija algo aquí.</p>
+                </div>
+                <div v-if="form.sistema_pensiones !== 'JUBILADO'"><label class="text-sm text-gray-700">Fecha afiliación pensión</label><input v-model="form.fecha_afiliacion_pension" type="date" :class="inp" /></div>
                 <div class="flex items-center gap-2 pt-6"><input v-model="form.aporta_sctr" type="checkbox" id="sctr" class="rounded" /><label for="sctr" class="text-sm">Aporta SCTR</label></div>
                 <div class="flex items-center gap-2 pt-6"><input v-model="form.aporta_senati" type="checkbox" id="sen" class="rounded" /><label for="sen" class="text-sm">Aporta Senati</label></div>
                 <div class="flex items-center gap-2 pt-6"><input v-model="form.tiene_vida_ley" type="checkbox" id="vl" class="rounded" /><label for="vl" class="text-sm">Tiene Seguro Vida Ley</label></div>

@@ -202,44 +202,47 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
 
             <div class="overflow-x-auto bg-white shadow-sm sm:rounded-lg">
                 <table class="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
+                    <thead class="bg-gray-50 text-left text-[11px] uppercase tracking-wide text-gray-500">
                         <tr>
-                            <th class="px-4 py-3">DNI / Documento</th>
-                            <th class="px-4 py-3">Nombres y apellidos</th>
-                            <th class="px-4 py-3">Empresa</th>
-                            <th class="px-4 py-3">Cargo</th>
-                            <th class="px-4 py-3">Horario</th>
-                            <th class="px-4 py-3">Sueldo</th>
-                            <th class="px-4 py-3">Pensión</th>
-                            <th class="px-4 py-3 text-right">Acciones</th>
+                            <th class="px-3 py-2">DNI / Documento</th>
+                            <th class="px-3 py-2">Nombres y apellidos</th>
+                            <th class="px-3 py-2">Empresa</th>
+                            <th class="px-3 py-2">Cargo</th>
+                            <th class="px-3 py-2">Horario</th>
+                            <th class="px-3 py-2">Sueldo</th>
+                            <th class="px-3 py-2">Pensión</th>
+                            <th class="px-3 py-2 text-right">Acciones</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-200">
+                    <tbody class="divide-y divide-gray-100">
                         <tr v-for="emp in empleadosFiltrados" :key="emp.id" class="hover:bg-gray-50">
-                            <td class="px-4 py-3 font-medium text-gray-900">{{ emp.numero_documento }}</td>
-                            <td class="px-4 py-3 text-gray-700">
+                            <td class="whitespace-nowrap px-3 py-2 text-[13px] font-medium text-gray-900">{{ emp.numero_documento }}</td>
+                            <td class="px-3 py-2 text-[13px] text-gray-700">
                                 {{ emp.nombre_completo }}
-                                <span v-if="emp.dias_vencimiento !== null" :class="badgeVenc(emp.dias_vencimiento).clase" class="ml-1 rounded-full px-2 py-0.5 text-xs font-semibold" :title="'Contrato vence el ' + emp.fecha_cese">{{ badgeVenc(emp.dias_vencimiento).texto }}</span>
+                                <span v-if="emp.dias_vencimiento !== null" :class="badgeVenc(emp.dias_vencimiento).clase" class="ml-1 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-semibold" :title="'Contrato vence el ' + emp.fecha_cese">{{ badgeVenc(emp.dias_vencimiento).texto }}</span>
                             </td>
-                            <td class="px-4 py-3"><span class="rounded-full bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-700">{{ emp.empresa ?? '—' }}</span></td>
-                            <td class="px-4 py-3 text-gray-700">
-                                <div>{{ emp.cargo ?? '—' }}</div>
-                                <div class="text-xs text-gray-400">{{ emp.area ?? '' }}</div>
+                            <td class="whitespace-nowrap px-3 py-2"><span class="rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700">{{ emp.empresa ?? '—' }}</span></td>
+                            <td class="px-3 py-2 text-[13px] leading-tight text-gray-700">
+                                <div class="truncate">{{ emp.cargo ?? '—' }}</div>
+                                <div class="truncate text-[10px] uppercase tracking-wide text-gray-400">{{ emp.area ?? '' }}</div>
                             </td>
-                            <td class="px-4 py-3">
-                                <span v-if="emp.turno" class="rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700" :title="emp.turno">{{ emp.turno_horario ?? emp.turno }}</span>
-                                <span v-else class="rounded-full bg-red-50 px-2 py-1 text-xs font-semibold text-red-600" title="Falta asignar turno/horario">⚠ Sin horario</span>
+                            <td class="whitespace-nowrap px-3 py-2">
+                                <span v-if="emp.turno" class="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700" :title="emp.turno">{{ emp.turno_horario ?? emp.turno }}</span>
+                                <span v-else class="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-600" title="Falta asignar turno/horario">⚠ Sin horario</span>
                             </td>
-                            <td class="px-4 py-3 text-gray-700">{{ money(emp.sueldo_basico) }}</td>
-                            <td class="px-4 py-3 text-gray-700">{{ emp.sistema_pensiones ?? '—' }}</td>
-                            <td class="px-4 py-3">
-                                <div class="flex items-center justify-end gap-2">
-                                    <a :href="route('empleados.ficha', emp.id)" class="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100" title="Generar ficha PDF para imprimir y firmar">🖨 Ficha</a>
-                                    <a :href="route('empleados.contrato', emp.id)" class="inline-flex items-center gap-1 rounded-md bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700 hover:bg-sky-100" title="Generar contrato PDF para imprimir y firmar">📄 Contrato</a>
-                                    <button @click="abrirDocs(emp)" class="inline-flex items-center gap-1 rounded-md bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200" title="Documentos archivados">📎 Docs <span v-if="emp.documentos?.length" class="ml-0.5 rounded-full bg-gray-700 px-1.5 text-white">{{ emp.documentos.length }}</span></button>
-                                    <button v-if="puedeGestionar" @click="abrirEditar(emp)" class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100">✎ Editar</button>
-                                    <button v-if="puedeGestionar && emp.activo" @click="cesar(emp)" class="inline-flex items-center gap-1 rounded-md bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100" title="Cesar: deja de aparecer en la planilla, se conserva su historial">🚫 Cesar</button>
-                                    <button v-if="puedeGestionar && !emp.activo" @click="cesar(emp)" class="inline-flex items-center gap-1 rounded-md bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-100" title="Reactivar: vuelve a la planilla">✓ Activar</button>
+                            <td class="whitespace-nowrap px-3 py-2 text-[13px] tabular-nums text-gray-700">{{ money(emp.sueldo_basico) }}</td>
+                            <td class="whitespace-nowrap px-3 py-2 text-[13px] text-gray-700">
+                                {{ emp.sistema_pensiones ?? '—' }}
+                                <span v-if="emp.sistema_pensiones === 'JUBILADO' && emp.afp" class="text-[11px] text-gray-400" :title="'Antes de jubilarse correspondía a ' + emp.afp">(correspondía: {{ emp.afp === 'ONP' ? 'ONP' : 'AFP ' + emp.afp }})</span>
+                            </td>
+                            <td class="px-3 py-2">
+                                <div class="flex items-center justify-end gap-1">
+                                    <a :href="route('empleados.ficha', emp.id)" class="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100" title="Generar ficha PDF para imprimir y firmar">🖨 Ficha</a>
+                                    <a :href="route('empleados.contrato', emp.id)" class="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-sky-50 px-2 py-1 text-[11px] font-semibold text-sky-700 hover:bg-sky-100" title="Generar contrato PDF para imprimir y firmar">📄 Contrato</a>
+                                    <button @click="abrirDocs(emp)" class="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-gray-100 px-2 py-1 text-[11px] font-semibold text-gray-700 hover:bg-gray-200" title="Documentos archivados">📎 Docs<span v-if="emp.documentos?.length" class="ml-0.5 rounded-full bg-gray-700 px-1 text-white">{{ emp.documentos.length }}</span></button>
+                                    <button v-if="puedeGestionar" @click="abrirEditar(emp)" class="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-indigo-50 px-2 py-1 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100">✎ Editar</button>
+                                    <button v-if="puedeGestionar && emp.activo" @click="cesar(emp)" class="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700 hover:bg-amber-100" title="Cesar: deja de aparecer en la planilla, se conserva su historial">🚫 Cesar</button>
+                                    <button v-if="puedeGestionar && !emp.activo" @click="cesar(emp)" class="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-green-50 px-2 py-1 text-[11px] font-semibold text-green-700 hover:bg-green-100" title="Reactivar: vuelve a la planilla">✓ Activar</button>
                                 </div>
                             </td>
                         </tr>

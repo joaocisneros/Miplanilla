@@ -116,10 +116,10 @@ const menu = computed(() => [
                 <span class="text-lg font-semibold text-white">MiPlanilla</span>
             </div>
 
-            <nav class="sidebar-scroll flex-1 overflow-y-auto px-3 py-4">
+            <nav class="sidebar-scroll flex-1 overflow-y-auto px-3 py-3">
                 <template v-for="grupo in menu" :key="grupo.titulo">
-                    <div v-if="grupo.items.some((i) => i.show)" class="mb-6">
-                        <p class="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-gray-500">{{ grupo.titulo }}</p>
+                    <div v-if="grupo.items.some((i) => i.show)" class="mb-3.5">
+                        <p class="mb-1 px-2 text-xs font-semibold uppercase tracking-wider text-gray-500">{{ grupo.titulo }}</p>
                         <template v-for="item in grupo.items" :key="item.label">
                             <Link
                                 v-if="item.show"
@@ -128,7 +128,7 @@ const menu = computed(() => [
                                 :class="route().current(item.active)
                                     ? 'bg-indigo-600 text-white'
                                     : 'text-gray-300 hover:bg-gray-800 hover:text-white'"
-                                class="mb-1 flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition"
+                                class="mb-0.5 flex items-center gap-3 rounded-md px-3 py-1.5 text-sm font-medium transition"
                             >
                                 <span class="text-base">{{ item.icon }}</span>
                                 <span>{{ item.label }}</span>

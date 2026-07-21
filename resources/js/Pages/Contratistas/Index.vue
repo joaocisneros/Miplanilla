@@ -245,16 +245,18 @@ function eliminarTrabajo(t) {
 
 // Sugiere el siguiente correlativo "NNN/AA" mirando todos los codigos existentes
 function siguienteCodigo() {
+    // Serie POR AÑO: el correlativo cuenta solo los códigos del año actual
+    // (formato NNN/AA). Al cambiar el año, arranca de nuevo en 001/AA.
+    const anio = String(new Date().getFullYear()).slice(-2);
     let max = 0;
     const codigosTodos = [
         ...props.codigos.map((c) => c.codigo),
         ...props.contratistas.flatMap((c) => c.ordenes.map((o) => o.codigo)),
     ];
     for (const cod of codigosTodos) {
-        const m = String(cod).match(/^0*(\d+)/);
+        const m = String(cod).match(new RegExp(`^0*(\\d+)\\/${anio}$`));
         if (m) max = Math.max(max, parseInt(m[1], 10));
     }
-    const anio = String(new Date().getFullYear()).slice(-2);
     return `${String(max + 1).padStart(3, '0')}/${anio}`;
 }
 
@@ -320,6 +322,42 @@ function estadoOt(ot) {
     if (ot.saldo_por_pagar > 0) return { texto: 'en curso · falta pagar', clase: 'bg-blue-100 text-blue-800' };
     return { texto: 'en curso', clase: 'bg-blue-100 text-blue-800' };
 }
+
+// ---- Vista POR UNIDAD: una misma unidad (código) puede tener OTs de varios
+// contratistas; aquí se ve quiénes le están trabajando y a quién falta pagar.
+const buscaUnidad = ref('');
+const unidadSel = ref('');
+const unidades = computed(() => {
+    const mapa = {};
+    for (const c of props.contratistas) {
+        for (const ot of c.ordenes) {
+            if (!mapa[ot.codigo]) mapa[ot.codigo] = { codigo: ot.codigo, producto: ot.producto, n: 0, saldo: 0 };
+            mapa[ot.codigo].n++;
+            mapa[ot.codigo].saldo += ot.saldo_por_pagar;
+            if (!mapa[ot.codigo].producto && ot.producto) mapa[ot.codigo].producto = ot.producto;
+        }
+    }
+    const q = buscaUnidad.value.trim().toUpperCase();
+    return Object.values(mapa)
+        .filter((u) => !q || u.codigo.toUpperCase().includes(q) || String(u.producto ?? '').toUpperCase().includes(q))
+        .sort((a, b) => a.codigo.localeCompare(b.codigo, undefined, { numeric: true }));
+});
+const filasUnidad = computed(() => {
+    if (!unidadSel.value) return [];
+    const filas = [];
+    for (const c of props.contratistas) {
+        for (const ot of c.ordenes) {
+            if (ot.codigo === unidadSel.value) filas.push({ contratista: c.nombre, ot });
+        }
+    }
+    return filas.sort((a, b) => a.contratista.localeCompare(b.contratista));
+});
+const totalUnidad = computed(() => filasUnidad.value.reduce((s, f) => ({
+    precio: s.precio + f.ot.precio,
+    avanzado: s.avanzado + f.ot.monto_avanzado,
+    pagado: s.pagado + f.ot.monto_pagado,
+    saldo: s.saldo + f.ot.saldo_por_pagar,
+}), { precio: 0, avanzado: 0, pagado: 0, saldo: 0 }));
 </script>
 
 <template>
@@ -339,8 +377,69 @@ function estadoOt(ot) {
                 <!-- Pestañas -->
                 <div class="flex gap-2">
                     <button @click="tab = 'ots'" :class="tab === 'ots' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'" class="rounded-md px-4 py-2 text-sm font-semibold shadow-sm">📋 Órdenes de trabajo</button>
+                    <button @click="tab = 'unidad'" :class="tab === 'unidad' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'" class="rounded-md px-4 py-2 text-sm font-semibold shadow-sm">🚚 Por unidad</button>
                     <button @click="tab = 'corte'" :class="tab === 'corte' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'" class="rounded-md px-4 py-2 text-sm font-semibold shadow-sm">💵 Corte de pago</button>
                     <button v-if="puedeGestionar" @click="tab = 'productos'" :class="tab === 'productos' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'" class="rounded-md px-4 py-2 text-sm font-semibold shadow-sm">🏷️ Catálogos</button>
+                </div>
+
+                <!-- ===== Pestaña: POR UNIDAD (quiénes trabajan cada unidad y pagos) ===== -->
+                <div v-if="tab === 'unidad'" class="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(15rem,20rem)_1fr]">
+                    <div class="overflow-hidden rounded-lg bg-white shadow-sm">
+                        <div class="border-b border-gray-100 p-3">
+                            <input v-model="buscaUnidad" type="text" placeholder="🔍 Buscar unidad o producto..." class="w-full rounded-md border-gray-300 py-1.5 text-sm" />
+                        </div>
+                        <div class="max-h-[34rem] overflow-y-auto">
+                            <button v-for="u in unidades" :key="u.codigo" @click="unidadSel = u.codigo"
+                                class="block w-full border-b border-gray-50 px-4 py-2.5 text-left hover:bg-indigo-50/50"
+                                :class="unidadSel === u.codigo ? 'bg-indigo-50' : ''">
+                                <div class="flex items-center justify-between">
+                                    <span class="font-bold text-gray-800">{{ u.codigo }}</span>
+                                    <span v-if="u.saldo > 0" class="text-xs font-semibold text-red-600">{{ money(u.saldo) }}</span>
+                                    <span v-else class="text-xs text-green-600">✔ al día</span>
+                                </div>
+                                <div class="truncate text-xs text-gray-500">{{ u.producto }} · {{ u.n }} OT(s)</div>
+                            </button>
+                            <div v-if="unidades.length === 0" class="p-6 text-center text-sm text-gray-400">Sin resultados.</div>
+                        </div>
+                    </div>
+                    <div class="overflow-hidden rounded-lg bg-white shadow-sm">
+                        <div v-if="!unidadSel" class="p-10 text-center text-gray-400">Elige una unidad de la izquierda para ver quiénes le están trabajando.</div>
+                        <template v-else>
+                            <div class="flex flex-wrap items-center gap-3 border-b border-gray-100 p-4">
+                                <div>
+                                    <div class="text-lg font-bold text-gray-900">{{ unidadSel }}</div>
+                                    <div class="text-xs text-gray-500">{{ filasUnidad[0]?.ot.producto }}</div>
+                                </div>
+                                <div class="ml-auto flex items-center gap-5 text-right">
+                                    <div><div class="text-[10px] uppercase text-gray-500">Pactado</div><div class="font-bold tabular-nums">{{ money(totalUnidad.precio) }}</div></div>
+                                    <div><div class="text-[10px] uppercase text-gray-500">Avanzado</div><div class="font-bold tabular-nums">{{ money(totalUnidad.avanzado) }}</div></div>
+                                    <div><div class="text-[10px] uppercase text-gray-500">Pagado</div><div class="font-bold tabular-nums text-green-700">{{ money(totalUnidad.pagado) }}</div></div>
+                                    <div><div class="text-[10px] uppercase text-gray-500">Falta pagar</div><div class="font-bold tabular-nums" :class="totalUnidad.saldo > 0 ? 'text-red-600' : 'text-gray-400'">{{ money(totalUnidad.saldo) }}</div></div>
+                                </div>
+                            </div>
+                            <table class="min-w-full text-sm">
+                                <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
+                                    <tr><th class="px-4 py-2">Contratista</th><th class="px-4 py-2">Trabajo que realiza</th><th class="px-4 py-2 text-right">Precio</th><th class="px-4 py-2">Avance</th><th class="px-4 py-2 text-right">Pagado</th><th class="px-4 py-2 text-right">Falta pagar</th><th class="px-4 py-2 text-center">Estado</th></tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 [&_td]:tabular-nums">
+                                    <tr v-for="f in filasUnidad" :key="f.ot.id" class="hover:bg-indigo-50/30">
+                                        <td class="whitespace-nowrap px-4 py-2.5 font-semibold text-gray-800">{{ f.contratista }}</td>
+                                        <td class="px-4 py-2.5 text-xs text-gray-600">{{ f.ot.descripcion }}</td>
+                                        <td class="whitespace-nowrap px-4 py-2.5 text-right">{{ money(f.ot.precio) }}</td>
+                                        <td class="px-4 py-2.5">
+                                            <div class="flex items-center gap-2">
+                                                <div class="h-2 w-24 overflow-hidden rounded-full bg-gray-200"><div class="h-full rounded-full bg-blue-500" :style="{ width: Math.min(f.ot.avance_total, 100) + '%' }"></div></div>
+                                                <span class="text-xs font-semibold">{{ f.ot.avance_total }}%</span>
+                                            </div>
+                                        </td>
+                                        <td class="whitespace-nowrap px-4 py-2.5 text-right text-green-700">{{ money(f.ot.monto_pagado) }}</td>
+                                        <td class="whitespace-nowrap px-4 py-2.5 text-right font-semibold" :class="f.ot.saldo_por_pagar > 0 ? 'text-red-600' : 'text-gray-400'">{{ money(f.ot.saldo_por_pagar) }}</td>
+                                        <td class="whitespace-nowrap px-4 py-2.5 text-center"><span :class="estadoOt(f.ot).clase" class="rounded-full px-2 py-0.5 text-[10px]">{{ estadoOt(f.ot).texto }}</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </template>
+                    </div>
                 </div>
 
                 <!-- ===== Pestaña: OTs por contratista (maestro-detalle) ===== -->
