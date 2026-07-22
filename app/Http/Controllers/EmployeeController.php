@@ -300,6 +300,9 @@ class EmployeeController extends Controller
             'area_id' => ['nullable', 'exists:areas,id'],
             'cargo_id' => ['nullable', 'exists:cargos,id'],
             'turno_id' => ['nullable', 'exists:turnos,id'],
+            // Día fijo de descanso semanal (1=lunes..7=domingo). Solo prellena la
+            // plantilla de asistencia; el cliente puede corregir un día puntual.
+            'dia_descanso_fijo' => ['nullable', 'integer', 'between:1,7'],
             // Derechohabientes
             'derechohabientes' => ['array'],
             'derechohabientes.*.tipo' => ['required_with:derechohabientes', 'in:hijo,conyuge,concubino'],
@@ -321,7 +324,7 @@ class EmployeeController extends Controller
                 'tipo_contrato', 'categoria_ocupacional', 'fecha_ingreso', 'fecha_cese', 'sueldo_basico',
                 'percibe_asignacion_familiar', 'movilidad', 'otros', 'sistema_pensiones', 'afp',
                 'tipo_afp', 'codigo_afp', 'fecha_afiliacion_pension', 'aporta_sctr', 'aporta_senati',
-                'tiene_vida_ley', 'area_id', 'cargo_id', 'turno_id',
+                'tiene_vida_ley', 'area_id', 'cargo_id', 'turno_id', 'dia_descanso_fijo',
             ]),
             'derechohabientes' => $request->input('derechohabientes', []),
         ];

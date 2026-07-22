@@ -20,6 +20,27 @@ class DashboardController extends Controller
         $empresas = Empresa::orderBy('id')->get(['id', 'razon_social', 'nombre_comercial']);
         $nombre = fn ($e) => $e->nombre_comercial ?: $e->razon_social;
 
+        // Un usuario con SOLO el rol EMPLEADO no debe ver totales/costos de toda la
+        // empresa (planilla neta, aportes, comparativos por empresa) — solo lo básico.
+        if (auth()->user()?->esSoloEmpleado()) {
+            return Inertia::render('Dashboard', [
+                'stats' => [
+                    'total_trabajadores' => null,
+                    'planilla_neto' => null,
+                    'aportes_empleador' => null,
+                    'tardanzas' => null,
+                    'faltas' => null,
+                    'mes_label' => '—',
+                    'empresas' => $empresas->count(),
+                ],
+                'charts' => [
+                    'trabajadoresPorEmpresa' => ['labels' => [], 'data' => []],
+                    'costoPorEmpresa' => ['labels' => [], 'data' => []],
+                    'pension' => ['labels' => [], 'data' => []],
+                ],
+            ]);
+        }
+
         // IDs de empleados visibles (respeta el candado por empresa del usuario).
         $empIds = Employee::pluck('id');
 

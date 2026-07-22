@@ -112,4 +112,14 @@ class User extends Authenticatable
     {
         return $this->id === 1;
     }
+
+    /**
+     * ¿Es SOLO un trabajador (rol EMPLEADO) sin ningún otro rol de gestión?
+     * Se usa para limitar su acceso a sus propios datos (boleta, asistencia),
+     * nunca a los de otros trabajadores.
+     */
+    public function esSoloEmpleado(): bool
+    {
+        return $this->hasRole('EMPLEADO') && ! $this->hasAnyRole(['ADMIN', 'RRHH', 'SUPERVISOR', 'CONTADOR', 'AUDITOR']);
+    }
 }

@@ -17,6 +17,9 @@ function cerrarEnMovil() {
 
 const roles = computed(() => page.props.auth?.roles ?? []);
 const esAdmin = computed(() => roles.value.includes('ADMIN'));
+// Mismo criterio que User::esSoloEmpleado() en el backend: rol EMPLEADO sin ningún otro rol de gestión.
+const esSoloEmpleado = computed(() => roles.value.includes('EMPLEADO')
+    && !roles.value.some((r) => ['ADMIN', 'RRHH', 'SUPERVISOR', 'CONTADOR', 'AUDITOR'].includes(r)));
 
 // Datos del usuario para el botón/menú de arriba
 const usuario = computed(() => page.props.auth.user);
@@ -38,7 +41,7 @@ const menu = computed(() => [
     {
         titulo: 'Asistencia',
         items: [
-            { label: 'Asistencia diaria', icon: '🕒', route: 'asistencia.diario', active: 'asistencia.diario', show: can('asistencia.ver') },
+            { label: 'Asistencia diaria', icon: '🕒', route: 'asistencia.diario', active: 'asistencia.diario', show: can('asistencia.ver') && !esSoloEmpleado.value },
             { label: 'Consolidado de asistencia', icon: '📋', route: 'asistencia.resumen', active: 'asistencia.resumen', show: can('asistencia.ver') },
             { label: 'Historial asistencia', icon: '📅', route: 'asistencia.index', active: 'asistencia.index', show: can('asistencia.ver') },
         ],

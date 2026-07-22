@@ -62,18 +62,18 @@ Route::middleware('auth')->group(function () {
     // Asistencia (registro diario manual + importación Excel/biométrico)
     Route::get('asistencia', [AsistenciaController::class, 'index'])->middleware('permission:asistencia.ver')->name('asistencia.index');
     Route::get('asistencia/resumen', [AsistenciaController::class, 'resumen'])->middleware('permission:asistencia.ver')->name('asistencia.resumen');
-    Route::get('asistencia/diario', [AsistenciaController::class, 'diario'])->middleware('permission:asistencia.ver')->name('asistencia.diario');
+    Route::get('asistencia/diario', [AsistenciaController::class, 'diario'])->middleware(['permission:asistencia.ver', 'bloquea.empleado'])->name('asistencia.diario');
     Route::post('asistencia/diario', [AsistenciaController::class, 'guardarDiario'])->middleware('permission:asistencia.sincronizar|asistencia.justificar')->name('asistencia.diario.guardar');
     Route::post('asistencia/empleado-mes', [AsistenciaController::class, 'guardarEmpleadoMes'])->middleware('permission:asistencia.sincronizar|asistencia.justificar')->name('asistencia.empleado-mes.guardar');
-    Route::get('asistencia/plantilla', [AsistenciaController::class, 'plantilla'])->middleware('permission:asistencia.ver')->name('asistencia.plantilla');
+    Route::get('asistencia/plantilla', [AsistenciaController::class, 'plantilla'])->middleware(['permission:asistencia.ver', 'bloquea.empleado'])->name('asistencia.plantilla');
     Route::post('asistencia/import', [AsistenciaController::class, 'import'])->middleware('permission:asistencia.sincronizar')->name('asistencia.import');
-    Route::get('asistencia/plantilla-marcaciones', [AsistenciaController::class, 'plantillaMarcaciones'])->middleware('permission:asistencia.ver')->name('asistencia.plantilla-marcaciones');
+    Route::get('asistencia/plantilla-marcaciones', [AsistenciaController::class, 'plantillaMarcaciones'])->middleware(['permission:asistencia.ver', 'bloquea.empleado'])->name('asistencia.plantilla-marcaciones');
     Route::post('asistencia/import-marcaciones', [AsistenciaController::class, 'importMarcaciones'])->middleware('permission:asistencia.sincronizar')->name('asistencia.import-marcaciones');
-    Route::get('asistencia/plantilla-resumen', [AsistenciaController::class, 'plantillaResumen'])->middleware('permission:asistencia.ver')->name('asistencia.plantilla-resumen');
+    Route::get('asistencia/plantilla-resumen', [AsistenciaController::class, 'plantillaResumen'])->middleware(['permission:asistencia.ver', 'bloquea.empleado'])->name('asistencia.plantilla-resumen');
     Route::post('asistencia/import-resumen', [AsistenciaController::class, 'importResumen'])->middleware('permission:asistencia.sincronizar')->name('asistencia.import-resumen');
     // Plantilla mensual (formato A: fila por día) + anual (pestaña por mes) + importador
-    Route::get('asistencia/plantilla-mensual', [AsistenciaController::class, 'plantillaMensual'])->middleware('permission:asistencia.ver')->name('asistencia.plantilla-mensual');
-    Route::get('asistencia/plantilla-anual', [AsistenciaController::class, 'plantillaAnual'])->middleware('permission:asistencia.ver')->name('asistencia.plantilla-anual');
+    Route::get('asistencia/plantilla-mensual', [AsistenciaController::class, 'plantillaMensual'])->middleware(['permission:asistencia.ver', 'bloquea.empleado'])->name('asistencia.plantilla-mensual');
+    Route::get('asistencia/plantilla-anual', [AsistenciaController::class, 'plantillaAnual'])->middleware(['permission:asistencia.ver', 'bloquea.empleado'])->name('asistencia.plantilla-anual');
     Route::post('asistencia/import-mensual', [AsistenciaController::class, 'importMensual'])->middleware('permission:asistencia.sincronizar')->name('asistencia.import-mensual');
 
     // Planilla
@@ -213,6 +213,7 @@ Route::middleware(['auth', 'role:ADMIN'])->prefix('admin')->name('admin.')->grou
 
     Route::get('turnos', [TurnoController::class, 'index'])->name('turnos.index');
     Route::post('turnos', [TurnoController::class, 'store'])->name('turnos.store');
+    Route::post('turnos/rotar-vigilancia', [TurnoController::class, 'rotarVigilancia'])->name('turnos.rotar-vigilancia');
     Route::put('turnos/{turno}', [TurnoController::class, 'update'])->name('turnos.update');
     Route::delete('turnos/{turno}', [TurnoController::class, 'destroy'])->name('turnos.destroy');
 

@@ -22,8 +22,13 @@ class AsistenciaController extends Controller
         $desde = $request->input('desde', now()->startOfMonth()->toDateString());
         $hasta = $request->input('hasta', now()->toDateString());
 
+        // Un usuario con SOLO el rol EMPLEADO únicamente ve su propia asistencia.
+        $user = $request->user();
+        $soloYo = $user->esSoloEmpleado();
+
         $registros = Attendance::with(['employee:id,apellido_paterno,apellido_materno,nombres', 'empresa:id,razon_social,nombre_comercial'])
             ->when($empresaId, fn ($q) => $q->where('empresa_id', $empresaId))
+            ->when($soloYo, fn ($q) => $q->where('employee_id', $user->empleado?->id))
             ->whereBetween('fecha', [$desde, $hasta])
             ->orderByDesc('fecha')
             ->limit(500)
@@ -146,9 +151,14 @@ class AsistenciaController extends Controller
 
         $trabajadoEstados = ['NORMAL', 'TRABAJO_SABADO', 'TRABAJO_DOMINGO', 'TRABAJO_FERIADO'];
 
+        // Un usuario con SOLO el rol EMPLEADO únicamente ve su propio resumen.
+        $user = $request->user();
+        $soloYo = $user->esSoloEmpleado();
+
         $filas = collect();
         if ($empresaId) {
             $empleados = Employee::where('empresa_id', $empresaId)->where('activo', true)
+                ->when($soloYo, fn ($q) => $q->where('id', $user->empleado?->id))
                 ->orderBy('apellido_paterno')
                 ->get(['id', 'apellido_paterno', 'apellido_materno', 'nombres', 'numero_documento']);
 
@@ -505,17 +515,19 @@ class AsistenciaController extends Controller
         foreach ($empresas as $emp) {
             $ne = $emp->nombre_comercial ?: $emp->razon_social;
             foreach (Employee::where('empresa_id', $emp->id)->where('activo', true)->orderBy('apellido_paterno')->get() as $e) {
-                $turno = $turnosEmp[$e->id]?->turno;
+                $contrato = $turnosEmp[$e->id] ?? null;
+                $turno = $contrato?->turno;
                 for ($d = 1; $d <= $dias; $d++) {
                     $f = Carbon::create($anio, $mes, $d);
                     $esFeriado = isset($feriados[$f->toDateString()]);
-                    [$entDef, $salDef] = $esFeriado ? ['', ''] : $this->horarioPorDefecto($turno, $f);
+                    $esDescanso = ! $esFeriado && $this->esDescansoFijo($contrato, $f);
+                    [$entDef, $salDef] = ($esFeriado || $esDescanso) ? ['', ''] : $this->horarioPorDefecto($turno, $f);
                     $sh->setCellValue('A'.$r, $ne);
                     $sh->setCellValueExplicit('B'.$r, (string) $e->numero_documento, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
                     $sh->setCellValue('C'.$r, $e->apellido_paterno.' '.$e->nombres);
                     $sh->setCellValue('D'.$r, $f->format('d/m/Y'));
                     $sh->setCellValue('E'.$r, $diaSem[$f->format('D')]);
-                    $sh->setCellValue('F'.$r, $esFeriado ? $lblFeriado : 'Presente');
+                    $sh->setCellValue('F'.$r, $esFeriado ? $lblFeriado : ($esDescanso ? $this->estadosDisponibles()['DESCANSO'] : 'Presente'));
                     // Pre-llenado con el horario del turno: el cliente solo cambia excepciones.
                     $sh->setCellValueExplicit('G'.$r, $entDef, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
                     $sh->setCellValueExplicit('H'.$r, $salDef, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
@@ -639,14 +651,17 @@ class AsistenciaController extends Controller
             $ne = $emp->nombre_comercial ?: $emp->razon_social;
             foreach (Employee::where('empresa_id', $emp->id)->where('activo', true)->orderBy('apellido_paterno')->get() as $e) {
                 $mod = ($e->modalidad ?? 'planilla') === 'honorarios' ? 'RXH' : 'PLANILLA';
-                $turno = $turnosEmp[$e->id]?->turno;
+                $contrato = $turnosEmp[$e->id] ?? null;
+                $turno = $contrato?->turno;
                 for ($m = 1; $m <= 12; $m++) {
                     $dias = \Carbon\Carbon::create($anio, $m, 1)->daysInMonth;
                     for ($d = 1; $d <= $dias; $d++) {
                         $f = \Carbon\Carbon::create($anio, $m, $d);
                         $esFeriado = isset($feriados[$f->toDateString()]);
-                        [$entDef, $salDef] = $esFeriado ? ['', ''] : $this->horarioPorDefecto($turno, $f);
-                        $data[] = [$ne, (string) $e->numero_documento, $e->apellido_paterno.' '.$e->nombres, $meses[$m], $f->format('d/m/Y'), $diaSem[$f->format('D')], $esFeriado ? $lblFeriado : 'Presente', $entDef, $salDef, '', '', $mod];
+                        $esDescanso = ! $esFeriado && $this->esDescansoFijo($contrato, $f);
+                        [$entDef, $salDef] = ($esFeriado || $esDescanso) ? ['', ''] : $this->horarioPorDefecto($turno, $f);
+                        $estadoDef = $esFeriado ? $lblFeriado : ($esDescanso ? $this->estadosDisponibles()['DESCANSO'] : 'Presente');
+                        $data[] = [$ne, (string) $e->numero_documento, $e->apellido_paterno.' '.$e->nombres, $meses[$m], $f->format('d/m/Y'), $diaSem[$f->format('D')], $estadoDef, $entDef, $salDef, '', '', $mod];
                     }
                 }
             }
@@ -709,17 +724,19 @@ class AsistenciaController extends Controller
             foreach (Employee::where('empresa_id', $emp->id)->where('activo', true)->orderBy('apellido_paterno')->get() as $e) {
                 $reg = $registrada[$e->id] ?? collect();
                 $mod = ($e->modalidad ?? 'planilla') === 'honorarios' ? 'RXH' : 'PLANILLA';
-                $turno = $turnosEmp[$e->id]?->turno;
+                $contrato = $turnosEmp[$e->id] ?? null;
+                $turno = $contrato?->turno;
                 for ($m = 1; $m <= 12; $m++) {
                     $dias = \Carbon\Carbon::create($anio, $m, 1)->daysInMonth;
                     for ($d = 1; $d <= $dias; $d++) {
                         $f = \Carbon\Carbon::create($anio, $m, $d);
                         $a = $reg[$f->toDateString()] ?? null;
                         $esFeriado = isset($feriados[$f->toDateString()]);
-                        $estado = $a ? ($labels[$a->estado] ?? 'Presente') : ($esFeriado ? ($labels['FERIADO'] ?? 'Feriado') : 'Presente');
+                        $esDescanso = ! $esFeriado && ! $a && $this->esDescansoFijo($contrato, $f);
+                        $estado = $a ? ($labels[$a->estado] ?? 'Presente') : ($esFeriado ? ($labels['FERIADO'] ?? 'Feriado') : ($esDescanso ? $this->estadosDisponibles()['DESCANSO'] : 'Presente'));
                         // Sin registro: se pre-llena con el horario del turno (el cliente
-                        // solo cambia las excepciones); si es feriado, sin horas. Con registro: la hora real.
-                        [$entDef, $salDef] = $esFeriado ? ['', ''] : $this->horarioPorDefecto($turno, $f);
+                        // solo cambia las excepciones); si es feriado o descanso fijo, sin horas. Con registro: la hora real.
+                        [$entDef, $salDef] = ($esFeriado || $esDescanso) ? ['', ''] : $this->horarioPorDefecto($turno, $f);
                         $ent = ($a && $a->hora_entrada_real) ? substr((string) $a->hora_entrada_real, 0, 5) : ($a ? '' : $entDef);
                         $sal = ($a && $a->hora_salida_real) ? substr((string) $a->hora_salida_real, 0, 5) : ($a ? '' : $salDef);
                         $he = ($a && $a->horas_extra_aprobadas) ? 'SI' : '';
@@ -935,6 +952,12 @@ class AsistenciaController extends Controller
      * las plantillas (el cliente solo cambia las excepciones). Domingo va vacío;
      * sábado solo si el turno trabaja sábado.
      */
+    /** ¿Esta fecha cae en el día de descanso FIJO del trabajador (ej. vigilancia)? */
+    private function esDescansoFijo($contrato, \Carbon\Carbon $f): bool
+    {
+        return $contrato && $contrato->dia_descanso_fijo && (int) $f->format('N') === (int) $contrato->dia_descanso_fijo;
+    }
+
     private function horarioPorDefecto($turno, \Carbon\Carbon $f): array
     {
         $dow = (int) $f->format('N');

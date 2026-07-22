@@ -13,7 +13,7 @@ class Contract extends Model implements Auditable
     protected $table = 'contracts';
 
     protected $fillable = [
-        'employee_id', 'area_id', 'cargo_id', 'turno_id',
+        'employee_id', 'area_id', 'cargo_id', 'turno_id', 'dia_descanso_fijo',
         'tipo_contrato', 'categoria_ocupacional', 'fecha_ingreso', 'fecha_cese',
         'sueldo_basico', 'percibe_asignacion_familiar', 'movilidad', 'otros',
         'sistema_pensiones', 'afp', 'tipo_afp', 'codigo_afp', 'fecha_afiliacion_pension',

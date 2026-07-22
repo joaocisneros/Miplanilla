@@ -106,6 +106,7 @@ const form = useForm({
     area_id: c.area_id ?? '',
     cargo_id: c.cargo_id ?? '',
     turno_id: c.turno_id ?? '',
+    dia_descanso_fijo: c.dia_descanso_fijo ?? '',
     // Derechohabientes
     derechohabientes: props.derechohabientes.map((d) => ({
         tipo: d.tipo, nombres: d.nombres,
@@ -116,6 +117,11 @@ const form = useForm({
 
 // Sede y área dependen de la empresa elegida
 const esHonorarios = computed(() => form.modalidad === 'honorarios');
+// El día de descanso fijo solo aplica a vigilancia (los demás descansan domingo).
+const esVigilancia = computed(() => {
+    const t = props.turnos.find((x) => x.id === form.turno_id);
+    return !!t && t.nombre.toUpperCase().includes('VIGILANCIA');
+});
 const tipoEsPlazoFijo = computed(() => props.tiposContrato.find((t) => t.value === form.tipo_contrato)?.plazo_fijo ?? false);
 
 // RxH usa contrato CIVIL (locación de servicios); planilla usa los laborales.
@@ -269,6 +275,20 @@ const inp = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm';
                 <div><label class="text-sm text-gray-700">Área</label><select v-model="form.area_id" :class="inp" :disabled="!form.empresa_id"><option value="">{{ form.empresa_id ? '—' : '↑ Elige la empresa primero' }}</option><option v-for="a in areasFiltradas" :key="a.id" :value="a.id">{{ a.nombre }}</option></select><p v-if="!form.empresa_id" class="text-xs text-amber-600">Selecciona la empresa (arriba) para ver sus áreas.</p></div>
                 <div><label class="text-sm text-gray-700">Cargo</label><select v-model="form.cargo_id" :class="inp"><option value="">—</option><option v-for="ca in cargos" :key="ca.id" :value="ca.id">{{ ca.nombre }}</option></select></div>
                 <div><label class="text-sm text-gray-700">Turno</label><select v-model="form.turno_id" :class="inp"><option value="">—</option><option v-for="t in turnos" :key="t.id" :value="t.id">{{ t.nombre }}</option></select></div>
+                <div v-if="esVigilancia">
+                    <label class="text-sm text-gray-700">Día de descanso fijo</label>
+                    <select v-model="form.dia_descanso_fijo" :class="inp">
+                        <option value="">— Selecciona el día —</option>
+                        <option :value="1">Lunes</option>
+                        <option :value="2">Martes</option>
+                        <option :value="3">Miércoles</option>
+                        <option :value="4">Jueves</option>
+                        <option :value="5">Viernes</option>
+                        <option :value="6">Sábado</option>
+                        <option :value="7">Domingo</option>
+                    </select>
+                    <p class="mt-0.5 text-[11px] text-gray-400">Solo para quien NO descansa domingo (ej. vigilancia). Prellena la plantilla; si un mes rota, se corrige ese día puntual.</p>
+                </div>
             </div>
         </section>
 

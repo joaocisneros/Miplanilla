@@ -16,6 +16,10 @@ class BoletaController extends Controller
         // modalidad congelada en el detalle, no la actual del empleado.
         abort_if(($detalle->modalidad ?? 'planilla') === 'honorarios', 404);
 
+        // Un usuario con SOLO el rol EMPLEADO únicamente puede ver su propia boleta.
+        $user = $request->user();
+        abort_if($user->esSoloEmpleado() && $detalle->employee_id !== $user->empleado?->id, 403);
+
         $pdf = $this->generarPdf($detalle);
 
         return $pdf->download($this->nombreBoleta($detalle));
@@ -24,6 +28,9 @@ class BoletaController extends Controller
     /** Descarga TODAS las boletas de planilla (excluye honorarios) en un solo ZIP. */
     public function zip(Request $request, Payroll $payroll)
     {
+        // El ZIP masivo (todos los trabajadores) no es para un usuario EMPLEADO.
+        abort_if($request->user()->esSoloEmpleado(), 403);
+
         $payroll->load(['empresa:id,razon_social', 'periodo', 'detalles.employee']);
 
         $detalles = $payroll->detalles->filter(fn ($d) => ($d->modalidad ?? 'planilla') !== 'honorarios');

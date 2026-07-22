@@ -11,6 +11,9 @@ const props = defineProps({
 
 const permisos = computed(() => usePage().props.auth?.permissions ?? []);
 const puedeImportar = computed(() => permisos.value.includes('asistencia.sincronizar'));
+const roles = computed(() => usePage().props.auth?.roles ?? []);
+const esSoloEmpleado = computed(() => roles.value.includes('EMPLEADO')
+    && !roles.value.some((r) => ['ADMIN', 'RRHH', 'SUPERVISOR', 'CONTADOR', 'AUDITOR'].includes(r)));
 
 const fEmpresa = ref(props.filtros.empresa_id ?? '');
 const desde = ref(props.filtros.desde);
@@ -104,7 +107,7 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
         <template #header>
             <div class="flex items-center justify-between">
                 <h2 class="text-xl font-semibold text-gray-800">Historial de asistencia</h2>
-                <a :href="route('asistencia.diario')" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">Registro diario</a>
+                <a v-if="!esSoloEmpleado" :href="route('asistencia.diario')" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">Registro diario</a>
             </div>
         </template>
         <div class="p-6">

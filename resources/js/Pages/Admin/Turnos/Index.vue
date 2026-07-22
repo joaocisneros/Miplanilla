@@ -2,7 +2,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import CrudModal from '@/Components/CrudModal.vue';
 import BotonAccion from '@/Components/BotonAccion.vue';
-import { Head, useForm } from '@inertiajs/vue3';
+import { Head, router, useForm } from '@inertiajs/vue3';
 import { ref } from 'vue';
 
 defineProps({ turnos: { type: Array, default: () => [] } });
@@ -22,6 +22,11 @@ function guardar() {
     editandoId.value ? form.put(route('admin.turnos.update', editandoId.value), opts) : form.post(route('admin.turnos.store'), opts);
 }
 function eliminar(t) { if (confirm(`¿Eliminar el turno "${t.nombre}"?`)) form.delete(route('admin.turnos.destroy', t.id), { preserveScroll: true }); }
+function rotarVigilancia() {
+    if (confirm('¿Rotar a los vigilantes? Los que están en Día pasarán a Noche, y los que están en Noche pasarán a Día. Su día de descanso NO cambia.')) {
+        router.post(route('admin.turnos.rotar-vigilancia'), {}, { preserveScroll: true });
+    }
+}
 const inp = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm';
 </script>
 
@@ -31,7 +36,10 @@ const inp = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm';
         <template #header>
             <div class="flex items-center justify-between">
                 <h2 class="text-xl font-semibold text-gray-800">Turnos</h2>
-                <button @click="abrirNuevo" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">+ Nuevo turno</button>
+                <div class="flex gap-2">
+                    <button @click="rotarVigilancia" class="rounded-md bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-700">🔄 Rotar vigilantes</button>
+                    <button @click="abrirNuevo" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">+ Nuevo turno</button>
+                </div>
             </div>
         </template>
 

@@ -12,20 +12,24 @@ class RolePermissionSeeder extends Seeder
     {
         app()['cache']->forget('spatie.permission.cache');
 
-        // Permisos granulares por módulo
+        // Permisos granulares por módulo.
+        // NOTA: el panel /admin (usuarios, auditoría, empresas, sedes, etc.) es
+        // exclusivo del rol ADMIN por middleware `role:ADMIN` directo, NO por
+        // permisos — por eso no hay 'usuarios.*' ni 'auditoria.ver' aquí (existían
+        // antes pero no controlaban nada: eran casillas que no hacían nada).
+        // Cerrar/reabrir planilla también es exclusivo de ADMIN por middleware
+        // directo (decisión intencional), por eso tampoco hay 'planilla.cerrar'.
         $permisos = [
             // Configuración / maestros (ADMIN)
             'config.ver', 'config.editar',
-            'usuarios.ver', 'usuarios.gestionar',
-            'auditoria.ver',
             // Empleados (RRHH)
             'empleados.ver', 'empleados.gestionar',
             // Asistencia
-            'asistencia.ver', 'asistencia.sincronizar', 'asistencia.justificar', 'asistencia.validar',
+            'asistencia.ver', 'asistencia.sincronizar', 'asistencia.justificar',
             // Planilla
-            'planilla.ver', 'planilla.generar', 'planilla.cerrar',
+            'planilla.ver', 'planilla.generar',
             // Boletas / reportes
-            'boletas.ver', 'boletas.generar',
+            'boletas.ver',
             'reportes.ver',
             // Contratistas (pago por avance de obra)
             'contratistas.ver', 'contratistas.gestionar', 'contratistas.avance',
@@ -35,17 +39,21 @@ class RolePermissionSeeder extends Seeder
             Permission::firstOrCreate(['name' => $p]);
         }
 
+        // Borra permisos que ya no están definidos arriba (evita casillas "fantasma"
+        // que quedan en la base de datos pero no controlan nada en el código).
+        Permission::whereNotIn('name', $permisos)->delete();
+
         $roles = [
             'ADMIN' => $permisos, // todo
             'RRHH' => [
                 'empleados.ver', 'empleados.gestionar',
                 'asistencia.ver', 'asistencia.sincronizar', 'asistencia.justificar',
-                'planilla.ver', 'planilla.generar', 'planilla.cerrar',
-                'boletas.ver', 'boletas.generar', 'reportes.ver',
+                'planilla.ver', 'planilla.generar',
+                'boletas.ver', 'reportes.ver',
                 'contratistas.ver', 'contratistas.gestionar', 'contratistas.avance',
             ],
             'SUPERVISOR' => [
-                'asistencia.ver', 'asistencia.validar', 'asistencia.justificar',
+                'asistencia.ver', 'asistencia.justificar',
                 'empleados.ver', 'reportes.ver',
                 // El supervisor registra el avance de obra (no gestiona pagos).
                 'contratistas.ver', 'contratistas.avance',

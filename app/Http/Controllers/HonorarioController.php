@@ -213,14 +213,21 @@ class HonorarioController extends Controller
     {
         abort_unless(($detalle->modalidad ?? 'planilla') === 'honorarios', 404);
 
+        // Un usuario con SOLO el rol EMPLEADO únicamente puede ver su propio recibo.
+        $user = $request->user();
+        abort_if($user->esSoloEmpleado() && $detalle->employee_id !== $user->empleado?->id, 403);
+
         $pdf = $this->generarReciboPdf($detalle);
 
         return $pdf->download($this->nombreRecibo($detalle));
     }
 
     /** Descarga TODOS los recibos por honorarios de una planilla (payroll) en un ZIP. */
-    public function reciboZip(Payroll $payroll)
+    public function reciboZip(Request $request, Payroll $payroll)
     {
+        // El ZIP masivo (todos los trabajadores) no es para un usuario EMPLEADO.
+        abort_if($request->user()->esSoloEmpleado(), 403);
+
         $payroll->load(['periodo', 'empresa:id,razon_social', 'detalles.employee']);
 
         $detalles = $payroll->detalles->filter(fn ($d) => ($d->modalidad ?? 'planilla') === 'honorarios')
