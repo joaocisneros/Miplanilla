@@ -1,3 +1,15 @@
+# Compilar Vue/Tailwind con la misma fuente usada en desarrollo.
+# Esta etapa genera public/build desde cero en cada despliegue de Render.
+FROM node:22-alpine AS frontend
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . /app
+RUN npm run build
+
 # Imagen base con PHP 8.2
 FROM php:8.2-cli
 
@@ -15,6 +27,9 @@ WORKDIR /app
 
 # Copiar el proyecto
 COPY . /app
+
+# Copiar solamente el frontend recién compilado; no depende del build guardado en Git.
+COPY --from=frontend /app/public/build /app/public/build
 
 # Instalar dependencias PHP (optimizado)
 RUN composer install --optimize-autoloader --no-interaction --no-progress
