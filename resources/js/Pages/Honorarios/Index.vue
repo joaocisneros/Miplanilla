@@ -15,6 +15,14 @@ const roles = computed(() => usePage().props.auth?.roles ?? []);
 const puedeGenerar = computed(() => permisos.value.includes('planilla.generar'));
 // Cerrar y reabrir: SOLO el administrador.
 const puedeCerrar = computed(() => roles.value.includes('ADMIN'));
+const avisoAsistencia = ref('');
+watch(
+    () => usePage().props.flash?.error,
+    (mensaje) => {
+        if (typeof mensaje === 'string' && mensaje.startsWith('ASISTENCIA INCOMPLETA')) avisoAsistencia.value = mensaje;
+    },
+    { immediate: true },
+);
 
 // Filtros. Por defecto solo se ven los periodos ABIERTOS;
 // los cerrados se consultan eligiendo "Cerrados" (o "Todos").
@@ -209,5 +217,18 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                 </div>
             </form>
         </CrudModal>
+
+        <div v-if="avisoAsistencia" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 p-4" @click.self="avisoAsistencia = ''">
+            <div class="w-full max-w-2xl rounded-xl bg-white shadow-2xl">
+                <div class="flex items-center justify-between border-b px-5 py-4">
+                    <h3 class="text-lg font-bold text-red-700">⚠️ Asistencia incompleta</h3>
+                    <button @click="avisoAsistencia = ''" class="text-2xl text-gray-400 hover:text-gray-700">×</button>
+                </div>
+                <pre class="max-h-[60vh] overflow-auto whitespace-pre-wrap p-5 font-sans text-sm leading-6 text-gray-700">{{ avisoAsistencia }}</pre>
+                <div class="flex justify-end border-t px-5 py-4">
+                    <button @click="avisoAsistencia = ''" class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white">Entendido</button>
+                </div>
+            </div>
+        </div>
     </AuthenticatedLayout>
 </template>

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Planilla\PlanillaService;
+use App\Domain\Planilla\ValidadorAsistenciaPeriodo;
 use App\Exports\PlanillaDetalleExport;
 use App\Models\Empresa;
 use App\Models\Payroll;
@@ -92,12 +93,19 @@ class PlanillaController extends Controller
      * planilla por separado. Agiliza la operación sin mezclar empresas:
      * cada una conserva su planilla independiente (SUNAT/SUNAFIL por separado).
      */
-    public function generarTodas(Request $request, PlanillaService $service)
+    public function generarTodas(Request $request, PlanillaService $service, ValidadorAsistenciaPeriodo $validador)
     {
         $data = $this->validarPeriodo($request);
 
         $empresas = Empresa::where('activo', true)->get();
         $generadas = 0;
+
+        foreach ($empresas as $empresa) {
+            $periodoValidar = new Periodo(array_merge($data, ['empresa_id' => $empresa->id]));
+            if ($mensaje = $validador->mensaje($periodoValidar)) {
+                return back()->with('error', $mensaje);
+            }
+        }
 
         foreach ($empresas as $empresa) {
             // Candado quincena/mensual: si choca, se salta esa empresa.
@@ -131,9 +139,13 @@ class PlanillaController extends Controller
         return back()->with('success', "Planillas generadas en {$generadas} empresa(s), cada una por separado.");
     }
 
-    public function generar(Request $request, Periodo $periodo, PlanillaService $service)
+    public function generar(Request $request, Periodo $periodo, PlanillaService $service, ValidadorAsistenciaPeriodo $validador)
     {
         abort_if($periodo->estado === 'cerrado', 403, 'El periodo está cerrado.');
+
+        if ($mensaje = $validador->mensaje($periodo)) {
+            return back()->with('error', $mensaje);
+        }
 
         $service->generar($periodo, $request->user()->id);
         $periodo->update(['estado' => 'calculado']);
@@ -272,8 +284,11 @@ class PlanillaController extends Controller
         return Excel::download(new PlanillaDetalleExport($headings, $rows, $moneyCols, 26), $nombre);
     }
 
-    public function cerrar(Request $request, Payroll $payroll)
+    public function cerrar(Request $request, Payroll $payroll, ValidadorAsistenciaPeriodo $validador)
     {
+        if ($mensaje = $validador->mensaje($payroll->periodo)) {
+            return back()->with('error', $mensaje);
+        }
         $payroll->update(['estado' => 'cerrado', 'cerrado_at' => now()]);
         $payroll->periodo->update(['estado' => 'cerrado']);
 

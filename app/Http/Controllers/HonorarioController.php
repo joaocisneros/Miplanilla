@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Planilla\PlanillaService;
+use App\Domain\Planilla\ValidadorAsistenciaPeriodo;
 use App\Exports\PlanillaDetalleExport;
 use App\Models\Empresa;
 use App\Models\Payroll;
@@ -88,7 +89,7 @@ class HonorarioController extends Controller
      * en cada empresa que tenga trabajadores activos por honorarios. Es independiente
      * del módulo Planilla: el cliente no necesita entrar ahí para generar RxH.
      */
-    public function generar(Request $request, PlanillaService $service)
+    public function generar(Request $request, PlanillaService $service, ValidadorAsistenciaPeriodo $validador)
     {
         $data = $request->validate([
             'anio' => ['required', 'integer', 'min:2020', 'max:2100'],
@@ -105,6 +106,13 @@ class HonorarioController extends Controller
 
         if ($empresas->isEmpty()) {
             return back()->with('error', 'No hay trabajadores activos por honorarios en ninguna empresa.');
+        }
+
+        foreach ($empresas as $empresa) {
+            $periodoValidar = new Periodo(array_merge($data, ['empresa_id' => $empresa->id]));
+            if ($mensaje = $validador->mensaje($periodoValidar)) {
+                return back()->with('error', $mensaje);
+            }
         }
 
         $quincena = $data['quincena'] ?? null;
@@ -151,9 +159,13 @@ class HonorarioController extends Controller
      * Nota: recalcula TODO el periodo (planilla + honorarios), porque ambos
      * viven en el mismo payroll; no existe un recálculo "solo honorarios".
      */
-    public function recalcular(Request $request, Payroll $payroll, PlanillaService $service)
+    public function recalcular(Request $request, Payroll $payroll, PlanillaService $service, ValidadorAsistenciaPeriodo $validador)
     {
         abort_if($payroll->estado === 'cerrado', 403, 'El periodo está cerrado.');
+
+        if ($mensaje = $validador->mensaje($payroll->periodo)) {
+            return back()->with('error', $mensaje);
+        }
 
         $service->generar($payroll->periodo, $request->user()->id);
         $payroll->periodo->update(['estado' => 'calculado']);
@@ -165,8 +177,11 @@ class HonorarioController extends Controller
      * Cierra el periodo desde Honorarios. Nota: cierra TODO el payroll
      * (planilla + honorarios), porque ambos viven en el mismo periodo.
      */
-    public function cerrar(Payroll $payroll)
+    public function cerrar(Payroll $payroll, ValidadorAsistenciaPeriodo $validador)
     {
+        if ($mensaje = $validador->mensaje($payroll->periodo)) {
+            return back()->with('error', $mensaje);
+        }
         $payroll->update(['estado' => 'cerrado', 'cerrado_at' => now()]);
         $payroll->periodo->update(['estado' => 'cerrado']);
 
