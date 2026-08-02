@@ -10,7 +10,7 @@ use Carbon\CarbonPeriod;
 
 class ValidadorAsistenciaPeriodo
 {
-    /** @return array<int, array{empleado:string, faltantes:int, fechas:array<int,string>}> */
+    /** @return array<int, array{dni:string, empleado:string, faltantes:int, fechas:array<int,string>}> */
     public function pendientes(Periodo $periodo): array
     {
         $fechas = collect(CarbonPeriod::create($periodo->fecha_inicio, $periodo->fecha_fin))
@@ -44,6 +44,7 @@ class ValidadorAsistenciaPeriodo
 
             if ($faltantes->isNotEmpty()) {
                 $pendientes[] = [
+                    'dni' => (string) $empleado->numero_documento,
                     'empleado' => $empleado->nombre_completo,
                     'faltantes' => $faltantes->count(),
                     'fechas' => $faltantes->take(5)->all(),
@@ -51,7 +52,7 @@ class ValidadorAsistenciaPeriodo
             }
         }
 
-        return $pendientes;
+        return collect($pendientes)->sortBy('empleado')->values()->all();
     }
 
     public function mensaje(Periodo $periodo): ?string
@@ -61,8 +62,17 @@ class ValidadorAsistenciaPeriodo
             return null;
         }
 
+        $lista = collect($pendientes)->take(6)->values()->map(
+            fn ($item, $indice) => ($indice + 1).". DNI {$item['dni']} — {$item['empleado']}"
+        )->implode("\n");
+        $restantes = count($pendientes) > 6
+            ? "\n…y ".(count($pendientes) - 6).' trabajador(es) más.'
+            : '';
+
         return "ASISTENCIA INCOMPLETA\n\n"
-            .'No se puede crear, generar, recalcular ni cerrar este período porque falta registrar la asistencia. '
+            .'No se puede procesar este período porque falta registrar la asistencia de '
+            .count($pendientes)." trabajador(es).\n\n"
+            ."Pendientes:\n{$lista}{$restantes}\n\n"
             .'Completa la asistencia o importa el Resumen Excel correspondiente y vuelve a intentarlo.';
     }
 }
