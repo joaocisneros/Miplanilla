@@ -3,6 +3,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import CrudModal from '@/Components/CrudModal.vue';
 import BotonAccion from '@/Components/BotonAccion.vue';
 import EmpleadoForm from '@/Components/EmpleadoForm.vue';
+import Dropdown from '@/Components/Dropdown.vue';
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 
@@ -240,9 +241,16 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                                     <a :href="route('empleados.ficha', emp.id)" class="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100" title="Generar ficha PDF para imprimir y firmar">🖨 Ficha</a>
                                     <a :href="route('empleados.contrato', emp.id)" class="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-sky-50 px-2 py-1 text-[11px] font-semibold text-sky-700 hover:bg-sky-100" title="Generar contrato PDF para imprimir y firmar">📄 Contrato</a>
                                     <button @click="abrirDocs(emp)" class="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-gray-100 px-2 py-1 text-[11px] font-semibold text-gray-700 hover:bg-gray-200" title="Documentos archivados">📎 Docs<span v-if="emp.documentos?.length" class="ml-0.5 rounded-full bg-gray-700 px-1 text-white">{{ emp.documentos.length }}</span></button>
-                                    <button v-if="puedeGestionar" @click="abrirEditar(emp)" class="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-indigo-50 px-2 py-1 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100">✎ Editar</button>
-                                    <button v-if="puedeGestionar && emp.activo" @click="cesar(emp)" class="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700 hover:bg-amber-100" title="Cesar: deja de aparecer en la planilla, se conserva su historial">🚫 Cesar</button>
-                                    <button v-if="puedeGestionar && !emp.activo" @click="cesar(emp)" class="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-green-50 px-2 py-1 text-[11px] font-semibold text-green-700 hover:bg-green-100" title="Reactivar: vuelve a la planilla">✓ Activar</button>
+                                    <Dropdown v-if="puedeGestionar" align="right" width="44">
+                                        <template #trigger>
+                                            <button type="button" class="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-gray-100 px-2 py-1 text-[11px] font-semibold text-gray-700 hover:bg-gray-200">⋮ Más</button>
+                                        </template>
+                                        <template #content>
+                                            <button type="button" @click="abrirEditar(emp)" class="block w-full px-4 py-2 text-left text-[13px] font-semibold text-indigo-700 hover:bg-indigo-50">✎ Editar</button>
+                                            <button v-if="emp.activo" type="button" @click="cesar(emp)" class="block w-full px-4 py-2 text-left text-[13px] font-semibold text-amber-700 hover:bg-amber-50" title="Cesar: deja de aparecer en la planilla, se conserva su historial">🚫 Cesar</button>
+                                            <button v-else type="button" @click="cesar(emp)" class="block w-full px-4 py-2 text-left text-[13px] font-semibold text-green-700 hover:bg-green-50" title="Reactivar: vuelve a la planilla">✓ Activar</button>
+                                        </template>
+                                    </Dropdown>
                                 </div>
                             </td>
                         </tr>
