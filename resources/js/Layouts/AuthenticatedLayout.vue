@@ -28,6 +28,12 @@ const nombreRol = { ADMIN: 'Administrador', RRHH: 'Recursos Humanos', SUPERVISOR
 const rolPrincipal = computed(() => nombreRol[roles.value[0]] ?? (roles.value[0] || 'Usuario'));
 const permisos = computed(() => page.props.auth?.permissions ?? []);
 const can = (p) => permisos.value.includes(p);
+// Los avisos de asistencia tienen su propio modal en Planilla/Honorarios.
+// No se repiten como una franja de error general en la parte superior.
+const errorGeneral = computed(() => {
+    const mensaje = page.props.flash?.error;
+    return typeof mensaje === 'string' && !mensaje.startsWith('ASISTENCIA INCOMPLETA') ? mensaje : null;
+});
 
 // Definición del menú agrupado
 const menu = computed(() => [
@@ -206,7 +212,7 @@ const menu = computed(() => [
 
             <!-- Flash messages -->
             <div v-if="$page.props.flash?.success" class="mx-6 mt-4 rounded-md bg-green-50 px-4 py-3 text-sm text-green-800">{{ $page.props.flash.success }}</div>
-            <div v-if="$page.props.flash?.error" class="mx-6 mt-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-800">{{ $page.props.flash.error }}</div>
+            <div v-if="errorGeneral" class="mx-6 mt-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-800">{{ errorGeneral }}</div>
 
             <!-- Header de página -->
             <div v-if="$slots.header" class="bg-white px-4 py-3 shadow-sm sm:px-5">
