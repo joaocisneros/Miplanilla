@@ -288,7 +288,7 @@ class EmployeeController extends Controller
             'percibe_asignacion_familiar' => ['boolean'],
             'movilidad' => ['nullable', 'numeric', 'min:0'],
             'otros' => ['nullable', 'numeric', 'min:0'],
-            'sistema_pensiones' => ['nullable', 'in:AFP,ONP,NINGUNO,JUBILADO'],
+            'sistema_pensiones' => ['nullable', 'in:AFP,ONP,JUBILADO'],
             'afp' => ['nullable', 'string', 'max:50', 'required_if:sistema_pensiones,AFP'],
             'tipo_afp' => ['nullable', 'in:mixta,sueldo', 'required_if:sistema_pensiones,AFP'],
             'codigo_afp' => ['nullable', 'string', 'max:50'],

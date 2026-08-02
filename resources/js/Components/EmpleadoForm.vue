@@ -134,15 +134,15 @@ watch(() => form.modalidad, (m) => {
 }, { immediate: true });
 
 // Mantener coherentes los datos previsionales al cambiar de sistema.
-// NINGUNO no está afiliado; JUBILADO no aporta, pero puede conservar como
-// referencia la AFP/ONP a la que perteneció.
+// JUBILADO no aporta, pero puede conservar como referencia la AFP/ONP
+// a la que perteneció.
 watch(() => form.sistema_pensiones, (sistema) => {
     if (sistema !== 'AFP' && sistema !== 'JUBILADO') form.afp = '';
     if (sistema !== 'AFP') {
         form.tipo_afp = '';
         form.codigo_afp = '';
     }
-    if (sistema === 'NINGUNO' || sistema === 'JUBILADO') form.fecha_afiliacion_pension = '';
+    if (sistema === 'JUBILADO') form.fecha_afiliacion_pension = '';
 });
 const sedesFiltradas = computed(() => props.sedes.filter((s) => String(s.empresa_id) === String(form.empresa_id)));
 const areasFiltradas = computed(() => props.areas.filter((a) => String(a.empresa_id) === String(form.empresa_id)));
@@ -308,7 +308,7 @@ const inp = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm';
         <section v-if="!esHonorarios" class="bg-white p-6 shadow-sm sm:rounded-lg">
             <h3 class="mb-4 border-b pb-2 text-lg font-medium text-gray-900">5. Pensiones y seguros</h3>
             <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <div><label class="text-sm text-gray-700">Sistema de pensiones</label><select v-model="form.sistema_pensiones" :class="inp"><option value="">— Seleccionar —</option><option value="AFP">AFP</option><option value="ONP">ONP</option><option value="NINGUNO">NINGUNO (no afiliado, sin descuento)</option><option value="JUBILADO">JUBILADO (pensionista, sin descuento)</option></select></div>
+                <div><label class="text-sm text-gray-700">Sistema de pensiones</label><select v-model="form.sistema_pensiones" :class="inp"><option value="">— Seleccionar —</option><option value="AFP">AFP</option><option value="ONP">ONP</option><option value="JUBILADO">JUBILADO (pensionista, sin descuento)</option></select></div>
                 <div v-if="form.sistema_pensiones === 'AFP'"><label class="text-sm text-gray-700">AFP *</label><select v-model="form.afp" :class="inp"><option value="">—</option><option>INTEGRA</option><option>PRIMA</option><option>PROFUTURO</option><option>HABITAT</option></select><p v-if="form.errors.afp" class="text-xs text-red-600">{{ form.errors.afp }}</p></div>
                 <div v-if="form.sistema_pensiones === 'AFP'"><label class="text-sm text-gray-700">Tipo comisión *</label><select v-model="form.tipo_afp" :class="inp"><option value="">—</option><option value="mixta">Mixta</option><option value="sueldo">Flujo (sueldo)</option></select><p v-if="form.errors.tipo_afp" class="text-xs text-red-600">{{ form.errors.tipo_afp }}</p></div>
                 <div v-if="form.sistema_pensiones === 'AFP'"><label class="text-sm text-gray-700">Código AFP (CUSPP)</label><input v-model="form.codigo_afp" :class="inp" /></div>

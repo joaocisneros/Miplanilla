@@ -157,9 +157,9 @@ class PlanillaService
                     // Ingreso afecto adicional (col. AG "otros pensionables/incentivos" del cliente)
                     'otros_afectos' => $otrosAfectosAdic,
                     // Honorarios (RxH): sin pensión ni aportes de empleador. Planilla: normal.
-                    // Si el contrato no define sistema, se asume ONP; 'NINGUNO' y
-                    // 'JUBILADO' (pensionista que ya no aporta) = exonerados.
-                    'sistema_pensiones' => ($esHonorarios || $contrato->sistema_pensiones === 'JUBILADO')
+                    // Honorarios no aporta a pensión (valor técnico NINGUNO).
+                    // JUBILADO conserva su nombre real y la calculadora lo exonera.
+                    'sistema_pensiones' => $esHonorarios
                         ? 'NINGUNO' : ($contrato->sistema_pensiones ?: 'ONP'),
                     'afp' => $esHonorarios ? null : $contrato->afp,
                     'tipo_afp' => $esHonorarios ? null : $contrato->tipo_afp,
