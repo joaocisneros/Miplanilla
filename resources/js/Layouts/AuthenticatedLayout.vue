@@ -112,17 +112,17 @@ const menu = computed(() => [
         <!-- Sidebar -->
         <aside
             :class="sidebarAbierto ? 'translate-x-0' : '-translate-x-full'"
-            class="fixed inset-y-0 left-0 z-40 flex w-64 flex-col overflow-hidden bg-gray-900 text-gray-200 transition-transform duration-200"
+            class="fixed inset-y-0 left-0 z-40 flex w-56 flex-col overflow-hidden bg-gray-900 text-gray-200 transition-transform duration-200"
         >
-            <div class="flex h-16 items-center gap-2 border-b border-gray-800 px-4">
-                <ApplicationLogo class="h-8 w-auto fill-current text-white" />
-                <span class="text-lg font-semibold text-white">MiPlanilla</span>
+            <div class="flex h-14 items-center gap-2 border-b border-gray-800 px-3">
+                <ApplicationLogo class="h-7 w-auto fill-current text-white" />
+                <span class="text-base font-semibold text-white">MiPlanilla</span>
             </div>
 
-            <nav class="sidebar-scroll flex-1 overflow-y-auto px-3 py-3">
+            <nav class="sidebar-scroll flex-1 overflow-y-auto px-2.5 py-2.5">
                 <template v-for="grupo in menu" :key="grupo.titulo">
-                    <div v-if="grupo.items.some((i) => i.show)" class="mb-3.5">
-                        <p class="mb-1 px-2 text-xs font-semibold uppercase tracking-wider text-gray-500">{{ grupo.titulo }}</p>
+                    <div v-if="grupo.items.some((i) => i.show)" class="mb-3">
+                        <p class="mb-1 px-2 text-[11px] font-semibold uppercase tracking-wider text-gray-500">{{ grupo.titulo }}</p>
                         <template v-for="item in grupo.items" :key="item.label">
                             <Link
                                 v-if="item.show"
@@ -131,7 +131,7 @@ const menu = computed(() => [
                                 :class="route().current(item.active)
                                     ? 'bg-indigo-600 text-white'
                                     : 'text-gray-300 hover:bg-gray-800 hover:text-white'"
-                                class="mb-0.5 flex items-center gap-3 rounded-md px-3 py-1.5 text-sm font-medium transition"
+                                class="mb-0.5 flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium transition"
                             >
                                 <span class="text-base">{{ item.icon }}</span>
                                 <span>{{ item.label }}</span>
@@ -161,9 +161,9 @@ const menu = computed(() => [
         </aside>
 
         <!-- Contenido (en desktop se corre a la derecha; en celular el menú va encima) -->
-        <div :class="sidebarAbierto ? 'lg:ml-64' : 'ml-0'" class="flex min-h-screen flex-col transition-all duration-200">
+        <div :class="sidebarAbierto ? 'lg:ml-56' : 'ml-0'" class="flex min-h-screen flex-col transition-all duration-200">
             <!-- Topbar -->
-            <header class="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-gray-200 bg-white px-4 shadow-sm">
+            <header class="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-gray-200 bg-white px-4 shadow-sm">
                 <div class="flex items-center gap-3">
                     <button @click="sidebarAbierto = !sidebarAbierto" class="rounded-md p-2 text-gray-500 hover:bg-gray-100" title="Menú">
                         <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
@@ -209,7 +209,7 @@ const menu = computed(() => [
             <div v-if="$page.props.flash?.error" class="mx-6 mt-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-800">{{ $page.props.flash.error }}</div>
 
             <!-- Header de página -->
-            <div v-if="$slots.header" class="bg-white px-6 py-4 shadow-sm">
+            <div v-if="$slots.header" class="bg-white px-4 py-3 shadow-sm sm:px-5">
                 <slot name="header" />
             </div>
 

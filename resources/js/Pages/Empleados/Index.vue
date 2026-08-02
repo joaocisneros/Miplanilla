@@ -144,52 +144,52 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
             </div>
         </template>
 
-        <div class="p-6 space-y-4">
+        <div class="space-y-3 p-3 sm:p-4">
             <!-- Filtros -->
-            <div class="flex flex-wrap items-end gap-3 rounded-lg bg-white p-4 shadow-sm">
-                <div class="min-w-[220px] flex-1">
+            <div class="grid grid-cols-2 items-end gap-2 rounded-lg bg-white p-3 shadow-sm md:grid-cols-3 xl:grid-cols-[minmax(180px,1.35fr)_minmax(125px,.9fr)_minmax(125px,.9fr)_minmax(180px,1.3fr)_minmax(95px,.65fr)_minmax(125px,.9fr)_auto]">
+                <div class="col-span-2 min-w-0 md:col-span-1">
                     <label class="block text-xs uppercase text-gray-500">Buscar</label>
                     <input v-model="q" type="text" placeholder="Nombre o DNI…" class="w-full rounded-md border-gray-300 py-1.5 text-sm" />
                 </div>
-                <div>
+                <div class="min-w-0">
                     <label class="block text-xs uppercase text-gray-500">Empresa</label>
-                    <select v-model="fEmpresa" @change="cambiarEmpresaFiltro" :class="selectCls">
+                    <select v-model="fEmpresa" @change="cambiarEmpresaFiltro" :class="selectCls" class="w-full">
                         <option value="">Todas</option>
                         <option v-for="e in empresas" :key="e.id" :value="e.id">{{ e.nombre_comercial || e.razon_social }}</option>
                     </select>
                 </div>
-                <div>
+                <div class="min-w-0">
                     <label class="block text-xs uppercase text-gray-500">Área</label>
-                    <select v-model="fArea" :class="selectCls">
+                    <select v-model="fArea" :class="selectCls" class="w-full">
                         <option value="">Todas</option>
                         <option v-for="a in areasUnicas" :key="a" :value="a">{{ a }}</option>
                     </select>
                 </div>
-                <div>
+                <div class="min-w-0">
                     <label class="block text-xs uppercase text-gray-500">Cargo</label>
-                    <select v-model="fCargo" :class="selectCls">
+                    <select v-model="fCargo" :class="selectCls" class="w-full">
                         <option value="">Todos</option>
                         <option v-for="c in cargosUnicos" :key="c" :value="c">{{ c }}</option>
                     </select>
                 </div>
-                <div>
+                <div class="min-w-0">
                     <label class="block text-xs uppercase text-gray-500">Estado</label>
-                    <select v-model="fEstado" :class="selectCls">
+                    <select v-model="fEstado" :class="selectCls" class="w-full">
                         <option value="">Todos</option>
                         <option value="activo">Activos</option>
                         <option value="cesado">Cesados</option>
                     </select>
                 </div>
-                <div>
+                <div class="min-w-0">
                     <label class="block text-xs uppercase text-gray-500">Modalidad</label>
-                    <select v-model="fModalidad" :class="selectCls">
+                    <select v-model="fModalidad" :class="selectCls" class="w-full">
                         <option value="">Todos</option>
                         <option value="planilla">👷 Planilla</option>
                         <option value="honorarios">🧾 Honorarios (RxH)</option>
                     </select>
                 </div>
-                <button type="button" @click="exportar" class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">📥 Exportar Excel</button>
-                <div class="ml-auto self-center text-sm text-gray-500">{{ empleadosFiltrados.length }} de {{ empleados.length }}</div>
+                <button type="button" @click="exportar" class="whitespace-nowrap rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 sm:text-sm">📥 Exportar Excel</button>
+                <div class="col-span-full text-right text-xs text-gray-500">{{ empleadosFiltrados.length }} de {{ empleados.length }}</div>
             </div>
 
             <div v-if="contratosPorVencer.length" class="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
@@ -201,7 +201,17 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
             </div>
 
             <div class="overflow-x-auto bg-white shadow-sm sm:rounded-lg">
-                <table class="min-w-full divide-y divide-gray-200 text-sm">
+                <table class="w-full min-w-[1160px] table-fixed divide-y divide-gray-200 text-sm">
+                    <colgroup>
+                        <col class="w-[95px]" />
+                        <col class="w-[155px]" />
+                        <col class="w-[135px]" />
+                        <col class="w-[215px]" />
+                        <col class="w-[110px]" />
+                        <col class="w-[105px]" />
+                        <col class="w-[80px]" />
+                        <col class="w-[330px]" />
+                    </colgroup>
                     <thead class="bg-gray-50 text-left text-[11px] uppercase tracking-wide text-gray-500">
                         <tr>
                             <th class="px-3 py-2">DNI / Documento</th>
