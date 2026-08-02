@@ -12,6 +12,8 @@ const filtros = [
     { valor: 'created', label: 'Creaciones' },
     { valor: 'updated', label: 'Ediciones' },
     { valor: 'deleted', label: 'Eliminaciones' },
+    { valor: 'login', label: 'Inicios de sesión' },
+    { valor: 'logout', label: 'Cierres de sesión' },
 ];
 
 function filtrar(valor) {
@@ -23,6 +25,8 @@ const colorEvento = (raw) => ({
     updated: 'bg-amber-100 text-amber-700',
     deleted: 'bg-red-100 text-red-700',
     restored: 'bg-sky-100 text-sky-700',
+    login: 'bg-blue-100 text-blue-700',
+    logout: 'bg-slate-200 text-slate-700',
 }[raw] ?? 'bg-gray-100 text-gray-700');
 </script>
 

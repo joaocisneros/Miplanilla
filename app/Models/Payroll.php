@@ -6,9 +6,11 @@ use App\Models\Concerns\RestringidoPorEmpresa;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use OwenIt\Auditing\Contracts\Auditable;
 
-class Payroll extends Model
+class Payroll extends Model implements Auditable
 {
+    use \OwenIt\Auditing\Auditable;
     use RestringidoPorEmpresa;
 
     protected $table = 'payrolls';
@@ -40,5 +42,10 @@ class Payroll extends Model
     public function detalles(): HasMany
     {
         return $this->hasMany(PayrollDetail::class);
+    }
+
+    public function generadoPor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'generado_por');
     }
 }

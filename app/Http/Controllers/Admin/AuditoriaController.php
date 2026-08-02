@@ -22,6 +22,9 @@ class AuditoriaController extends Controller
         'PolizaSctr' => 'Póliza SCTR',
         'PolizaVidaLey' => 'Póliza Vida Ley',
         'TasaAfp' => 'Tasa AFP',
+        'Periodo' => 'Período de planilla',
+        'Payroll' => 'Planilla/Honorarios',
+        'User' => 'Sesión de usuario',
     ];
 
     private const EVENTOS = [
@@ -29,6 +32,8 @@ class AuditoriaController extends Controller
         'updated' => 'Editó',
         'deleted' => 'Eliminó',
         'restored' => 'Restauró',
+        'login' => 'Inició sesión',
+        'logout' => 'Cerró sesión',
     ];
 
     public function index(Request $request): Response
