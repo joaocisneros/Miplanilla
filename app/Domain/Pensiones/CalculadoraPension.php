@@ -27,7 +27,7 @@ class CalculadoraPension
         Carbon $fechaPeriodo
     ): array {
         // Sin sistema de pensiones (p. ej. pensionista jubilado exonerado de aporte).
-        if (in_array(strtoupper((string) $sistema), ['NINGUNO', 'NINGUNA', 'NONE', 'SIN', ''], true)) {
+        if (in_array(strtoupper((string) $sistema), ['NINGUNO', 'NINGUNA', 'JUBILADO', 'NONE', 'SIN', ''], true)) {
             return [
                 'aporte' => 0.0, 'comision' => 0.0, 'prima' => 0.0, 'total' => 0.0,
                 'detalle' => ['sistema' => 'NINGUNO'],

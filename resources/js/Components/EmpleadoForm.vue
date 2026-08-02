@@ -132,6 +132,18 @@ watch(() => form.modalidad, (m) => {
     if (m === 'honorarios') form.tipo_contrato = 'locacion_servicios';
     else if (form.tipo_contrato === 'locacion_servicios') form.tipo_contrato = '';
 }, { immediate: true });
+
+// Mantener coherentes los datos previsionales al cambiar de sistema.
+// NINGUNO no está afiliado; JUBILADO no aporta, pero puede conservar como
+// referencia la AFP/ONP a la que perteneció.
+watch(() => form.sistema_pensiones, (sistema) => {
+    if (sistema !== 'AFP' && sistema !== 'JUBILADO') form.afp = '';
+    if (sistema !== 'AFP') {
+        form.tipo_afp = '';
+        form.codigo_afp = '';
+    }
+    if (sistema === 'NINGUNO' || sistema === 'JUBILADO') form.fecha_afiliacion_pension = '';
+});
 const sedesFiltradas = computed(() => props.sedes.filter((s) => String(s.empresa_id) === String(form.empresa_id)));
 const areasFiltradas = computed(() => props.areas.filter((a) => String(a.empresa_id) === String(form.empresa_id)));
 
@@ -296,7 +308,7 @@ const inp = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm';
         <section v-if="!esHonorarios" class="bg-white p-6 shadow-sm sm:rounded-lg">
             <h3 class="mb-4 border-b pb-2 text-lg font-medium text-gray-900">5. Pensiones y seguros</h3>
             <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <div><label class="text-sm text-gray-700">Sistema de pensiones</label><select v-model="form.sistema_pensiones" :class="inp"><option value="">—</option><option value="AFP">AFP</option><option value="ONP">ONP</option><option value="JUBILADO">JUBILADO (ya se retiró, sin descuento)</option></select></div>
+                <div><label class="text-sm text-gray-700">Sistema de pensiones</label><select v-model="form.sistema_pensiones" :class="inp"><option value="">— Seleccionar —</option><option value="AFP">AFP</option><option value="ONP">ONP</option><option value="NINGUNO">NINGUNO (no afiliado, sin descuento)</option><option value="JUBILADO">JUBILADO (pensionista, sin descuento)</option></select></div>
                 <div v-if="form.sistema_pensiones === 'AFP'"><label class="text-sm text-gray-700">AFP *</label><select v-model="form.afp" :class="inp"><option value="">—</option><option>INTEGRA</option><option>PRIMA</option><option>PROFUTURO</option><option>HABITAT</option></select><p v-if="form.errors.afp" class="text-xs text-red-600">{{ form.errors.afp }}</p></div>
                 <div v-if="form.sistema_pensiones === 'AFP'"><label class="text-sm text-gray-700">Tipo comisión *</label><select v-model="form.tipo_afp" :class="inp"><option value="">—</option><option value="mixta">Mixta</option><option value="sueldo">Flujo (sueldo)</option></select><p v-if="form.errors.tipo_afp" class="text-xs text-red-600">{{ form.errors.tipo_afp }}</p></div>
                 <div v-if="form.sistema_pensiones === 'AFP'"><label class="text-sm text-gray-700">Código AFP (CUSPP)</label><input v-model="form.codigo_afp" :class="inp" /></div>
@@ -312,7 +324,7 @@ const inp = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm';
                     </select>
                     <p class="mt-0.5 text-[11px] text-gray-400">Solo informativo — no se le descuenta nada aunque se elija algo aquí.</p>
                 </div>
-                <div v-if="form.sistema_pensiones !== 'JUBILADO'"><label class="text-sm text-gray-700">Fecha afiliación pensión</label><input v-model="form.fecha_afiliacion_pension" type="date" :class="inp" /></div>
+                <div v-if="form.sistema_pensiones === 'AFP' || form.sistema_pensiones === 'ONP'"><label class="text-sm text-gray-700">Fecha afiliación pensión</label><input v-model="form.fecha_afiliacion_pension" type="date" :class="inp" /></div>
                 <div class="flex items-center gap-2 pt-6"><input v-model="form.aporta_sctr" type="checkbox" id="sctr" class="rounded" /><label for="sctr" class="text-sm">Aporta SCTR</label></div>
                 <div class="flex items-center gap-2 pt-6"><input v-model="form.aporta_senati" type="checkbox" id="sen" class="rounded" /><label for="sen" class="text-sm">Aporta Senati</label></div>
                 <div class="flex items-center gap-2 pt-6"><input v-model="form.tiene_vida_ley" type="checkbox" id="vl" class="rounded" /><label for="vl" class="text-sm">Tiene Seguro Vida Ley</label></div>
