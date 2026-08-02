@@ -82,6 +82,7 @@ Route::middleware('auth')->group(function () {
     Route::get('planilla/{payroll}/detalle-excel', [PlanillaController::class, 'exportDetalle'])->middleware('permission:planilla.ver')->name('planilla.detalle-excel');
     Route::middleware('permission:planilla.generar')->group(function () {
         Route::post('planilla/periodos', [PlanillaController::class, 'storePeriodo'])->name('planilla.periodos.store');
+        Route::delete('planilla/periodos/{periodo}', [PlanillaController::class, 'destroyPeriodo'])->name('planilla.periodos.destroy');
         Route::post('planilla/generar-todas', [PlanillaController::class, 'generarTodas'])->name('planilla.generar-todas');
         Route::post('planilla/periodos/{periodo}/generar', [PlanillaController::class, 'generar'])->name('planilla.generar');
     });

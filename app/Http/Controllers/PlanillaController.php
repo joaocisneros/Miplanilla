@@ -56,9 +56,13 @@ class PlanillaController extends Controller
         ]);
     }
 
-    public function storePeriodo(Request $request)
+    public function storePeriodo(Request $request, ValidadorAsistenciaPeriodo $validador)
     {
         $data = $this->validarPeriodo($request, conEmpresa: true);
+
+        if ($mensaje = $validador->mensaje(new Periodo($data))) {
+            return back()->with('error', $mensaje);
+        }
 
         if ($error = $this->conflictoQuincenaMensual($data['empresa_id'], (int) $data['anio'], (int) $data['mes'], $data['quincena'] ?? null)) {
             return back()->with('error', $error);
@@ -67,6 +71,18 @@ class PlanillaController extends Controller
         Periodo::create($data);
 
         return back()->with('success', 'Periodo creado.');
+    }
+
+    /** Elimina solamente períodos vacíos que todavía no tienen planilla generada. */
+    public function destroyPeriodo(Periodo $periodo)
+    {
+        if (Payroll::where('periodo_id', $periodo->id)->exists()) {
+            return back()->with('error', 'No se puede eliminar: este período ya tiene planilla u honorarios generados.');
+        }
+
+        $periodo->delete();
+
+        return back()->with('success', 'Período vacío eliminado correctamente.');
     }
 
     /**
