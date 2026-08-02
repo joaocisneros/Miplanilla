@@ -61,17 +61,8 @@ class ValidadorAsistenciaPeriodo
             return null;
         }
 
-        $detalle = collect($pendientes)->take(5)->map(
-            fn ($item) => "• {$item['empleado']} — {$item['faltantes']} día(s) pendientes"
-        )->implode("\n");
-
-        $extra = count($pendientes) > 5
-            ? "\n• Y ".(count($pendientes) - 5).' trabajador(es) más'
-            : '';
-
         return "ASISTENCIA INCOMPLETA\n\n"
-            ."No se creó ningún período ni planilla. Antes de continuar debes completar la asistencia de todo el personal.\n\n"
-            ."Trabajadores pendientes: ".count($pendientes)."\n{$detalle}{$extra}\n\n"
-            ."Ve a Asistencia diaria o importa el Resumen Excel correspondiente. Después vuelve a intentar.";
+            .'No se puede crear, generar, recalcular ni cerrar este período porque falta registrar la asistencia. '
+            .'Completa la asistencia o importa el Resumen Excel correspondiente y vuelve a intentarlo.';
     }
 }
