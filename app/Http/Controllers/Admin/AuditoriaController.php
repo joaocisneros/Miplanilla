@@ -40,7 +40,7 @@ class AuditoriaController extends Controller
     {
         $evento = $request->input('evento');
 
-        $audits = Audit::with('user:id,name')
+        $audits = Audit::with(['user:id,name', 'user.empleado:id,user_id,numero_documento'])
             ->when($evento, fn ($q) => $q->where('event', $evento))
             ->latest()
             ->paginate(30)
@@ -84,6 +84,7 @@ class AuditoriaController extends Controller
             'id' => $a->id,
             'fecha' => $a->created_at?->format('d/m/Y H:i'),
             'usuario' => $a->user?->name ?? 'Sistema',
+            'dni' => $a->user?->empleado?->numero_documento ?? 'No vinculado',
             'evento' => self::EVENTOS[$a->event] ?? $a->event,
             'evento_raw' => $a->event,
             'modelo' => self::MODELOS[$corto] ?? $corto,

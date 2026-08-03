@@ -63,6 +63,7 @@ const colorEvento = (raw) => ({
                         <thead class="border-b border-gray-200 bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                             <tr>
                                 <th class="px-4 py-3">Fecha</th>
+                                <th class="px-4 py-3">DNI</th>
                                 <th class="px-4 py-3">Usuario</th>
                                 <th class="px-4 py-3">Acción</th>
                                 <th class="px-4 py-3">Registro</th>
@@ -73,6 +74,7 @@ const colorEvento = (raw) => ({
                         <tbody class="divide-y divide-gray-100">
                             <tr v-for="a in audits.data" :key="a.id" class="align-top hover:bg-gray-50">
                                 <td class="whitespace-nowrap px-4 py-3 text-gray-500">{{ a.fecha }}</td>
+                                <td class="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-700">{{ a.dni }}</td>
                                 <td class="px-4 py-3 font-medium text-gray-800">{{ a.usuario }}</td>
                                 <td class="px-4 py-3">
                                     <span :class="colorEvento(a.evento_raw)" class="rounded-full px-2 py-1 text-xs font-semibold">{{ a.evento }}</span>
@@ -95,7 +97,7 @@ const colorEvento = (raw) => ({
                                 </td>
                             </tr>
                             <tr v-if="!audits.data.length">
-                                <td colspan="6" class="px-4 py-8 text-center text-gray-500">No hay movimientos registrados todavía.</td>
+                                <td colspan="7" class="px-4 py-8 text-center text-gray-500">No hay movimientos registrados todavía.</td>
                             </tr>
                         </tbody>
                     </table>
