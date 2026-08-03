@@ -89,7 +89,29 @@ class AuditoriaController extends Controller
             'modelo' => self::MODELOS[$corto] ?? $corto,
             'registro_id' => $a->auditable_id,
             'cambios' => $campos,
+            'ip' => $a->ip_address ?: 'No disponible',
+            'navegador' => $this->navegadorLegible((string) $a->user_agent),
         ];
+    }
+
+    private function navegadorLegible(string $agente): string
+    {
+        if ($agente === '') {
+            return 'No disponible';
+        }
+
+        $navegador = str_contains($agente, 'Edg/') ? 'Microsoft Edge'
+            : (str_contains($agente, 'OPR/') ? 'Opera'
+            : (str_contains($agente, 'Firefox/') ? 'Firefox'
+            : (str_contains($agente, 'Chrome/') ? 'Google Chrome'
+            : (str_contains($agente, 'Safari/') ? 'Safari' : 'Otro navegador'))));
+        $sistema = str_contains($agente, 'Windows') ? 'Windows'
+            : (str_contains($agente, 'Android') ? 'Android'
+            : (str_contains($agente, 'iPhone') || str_contains($agente, 'iPad') ? 'iOS'
+            : (str_contains($agente, 'Mac OS') ? 'macOS'
+            : (str_contains($agente, 'Linux') ? 'Linux' : 'Sistema desconocido'))));
+
+        return "{$navegador} · {$sistema}";
     }
 
     /** Recorta valores largos para mostrarlos en la tabla. */
