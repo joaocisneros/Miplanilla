@@ -61,7 +61,15 @@ class AuditoriaController extends Controller
 
         // Lista de cambios legibles (máx. 6 campos para no saturar).
         $campos = [];
-        foreach (array_slice($nuevos, 0, 6, true) as $campo => $valor) {
+        if ($corto === 'Periodo' && in_array($a->event, ['created', 'deleted'], true)) {
+            $datos = $a->event === 'created' ? $nuevos : $viejos;
+            $campos[] = [
+                'campo' => 'Período',
+                'antes' => $a->event === 'created' ? '—' : $this->periodoLegible($datos),
+                'despues' => $a->event === 'created' ? $this->periodoLegible($datos) : '—',
+            ];
+        }
+        foreach ($campos === [] ? array_slice($nuevos, 0, 6, true) : [] as $campo => $valor) {
             if (in_array($campo, ['updated_at', 'created_at', 'password', 'remember_token'], true)) {
                 continue;
             }
@@ -85,6 +93,19 @@ class AuditoriaController extends Controller
     }
 
     /** Recorta valores largos para mostrarlos en la tabla. */
+    private function periodoLegible(array $datos): string
+    {
+        $meses = [1 => 'Enero', 2 => 'Febrero', 3 => 'Marzo', 4 => 'Abril', 5 => 'Mayo', 6 => 'Junio',
+            7 => 'Julio', 8 => 'Agosto', 9 => 'Septiembre', 10 => 'Octubre', 11 => 'Noviembre', 12 => 'Diciembre'];
+        $mes = (int) ($datos['mes'] ?? 0);
+        $quincena = $datos['quincena'] ?? null;
+        $tipo = $quincena ? ((int) $quincena === 1 ? '1ra quincena' : '2da quincena') : 'Mes completo';
+        $inicio = ! empty($datos['fecha_inicio']) ? date('d/m/Y', strtotime($datos['fecha_inicio'])) : 'sin fecha';
+        $fin = ! empty($datos['fecha_fin']) ? date('d/m/Y', strtotime($datos['fecha_fin'])) : 'sin fecha';
+
+        return "{$tipo} de ".($meses[$mes] ?? "mes {$mes}").' '.($datos['anio'] ?? '')." ({$inicio} al {$fin})";
+    }
+
     private function corto($valor): ?string
     {
         if ($valor === null || $valor === '') {
