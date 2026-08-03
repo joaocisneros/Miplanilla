@@ -11,11 +11,13 @@ const props = defineProps({
     estados: { type: Object, default: () => ({}) },
     empresas: { type: Array, default: () => [] },
     sedes: { type: Array, default: () => [] },
+    turnos: { type: Array, default: () => [] },
 });
 
 const fEmpresa = ref(props.filtros.empresa_id ?? '');
 const fSede = ref(props.filtros.sede_id ?? '');
 const fecha = ref(props.fecha);
+const mostrarEstados = ref(false);
 const sedesFiltro = computed(() => props.sedes.filter((s) => !fEmpresa.value || String(s.empresa_id) === String(fEmpresa.value)));
 
 const form = useForm({
@@ -40,7 +42,27 @@ function desdeTolerancia(f) {
     return String(Math.floor(total / 60)).padStart(2, '0') + ':' + String(total % 60).padStart(2, '0');
 }
 
+// El backend/planilla usa f.horas_extra en horas decimales; en pantalla RRHH escribe minutos.
+function horasExtraMin(f) {
+    return f.horas_extra ? Math.round(f.horas_extra * 60) : 0;
+}
+function setHorasExtraMin(f, min) {
+    f.horas_extra = min ? Math.round((min / 60) * 100) / 100 : 0;
+    if (!f.horas_extra) f.horas_extra_aprobadas = false;
+}
+function minTexto(min) {
+    if (!min) return '';
+    const h = Math.floor(min / 60), m = min % 60;
+    return h ? `${h}h ${m}min` : `${m}min`;
+}
+
+function onEstadoChange(f) {
+    f.observacion = f.estado === 'NORMAL' ? '' : (props.estados[f.estado] || '');
+    recalc(f);
+}
+
 // Recalcula tardanza (min) y horas extra según el horario del turno y las horas marcadas.
+// Tardanza y horas extra son totalmente independientes: una no compensa a la otra.
 function recalc(f) {
     if (!trabajado(f.estado)) { f.minutos_tarde = 0; f.horas_extra = 0; f.horas_extra_aprobadas = false; return; }
     const ent = aMin(f.entrada), entTurno = aMin(f.turno_entrada);
@@ -89,6 +111,47 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
 
         <div class="p-6">
             <div class="space-y-4">
+                <div class="relative rounded-lg bg-blue-50 p-4 text-sm text-blue-800">
+                    Todos aparecen como <b>Presente</b> por defecto. Pon la <b>hora de entrada/salida</b> (la tardanza se calcula sola contra la hora de entrada del turno, al minuto exacto), o cambia el estado a quien faltó. Marca <b>HE aprob.</b> solo si el supervisor aprobó las horas extra. Luego guarda.
+                    <div class="mt-2">
+                        <button
+                            type="button"
+                            class="cursor-pointer font-semibold text-blue-900 hover:underline"
+                            @click="mostrarEstados = !mostrarEstados"
+                        >
+                            📖 ¿Qué significa cada estado? (clic para ver)
+                        </button>
+                        <div
+                            v-if="mostrarEstados"
+                            class="absolute left-0 right-0 z-10 mt-2 grid grid-cols-1 gap-4 rounded-lg border border-blue-200 bg-white p-4 text-xs shadow-lg md:grid-cols-3"
+                        >
+                            <div class="rounded-md bg-red-50 p-3">
+                                <div class="mb-1 font-bold text-red-700">🔴 Descuentan el día (no se paga)</div>
+                                <p class="text-red-900"><b>Falta:</b> no vino y no justificó.</p>
+                                <p class="text-red-900"><b>Licencia sin goce:</b> permiso acordado pero sin pago.</p>
+                            </div>
+                            <div class="rounded-md bg-green-50 p-3">
+                                <div class="mb-1 font-bold text-green-700">🟢 El día se paga igual</div>
+                                <p class="text-green-900"><b>Falta justificada:</b> justificación aceptada.</p>
+                                <p class="text-green-900"><b>Vacaciones:</b> goce vacacional.</p>
+                                <p class="text-green-900"><b>Licencia con goce:</b> permiso pagado por ley (fallecimiento, paternidad…).</p>
+                                <p class="text-green-900"><b>Descanso médico:</b> incapacidad con certificado (primeros 20 días/año los paga la empresa).</p>
+                                <p class="text-green-900"><b>Subsidio:</b> desde el día 21 lo paga EsSalud.</p>
+                                <p class="text-green-900"><b>Descanso:</b> su día libre de la semana (ej. rotativo de vigilancia).</p>
+                                <p class="text-green-900"><b>Licencia hijo enfermo:</b> ley de cuidado familiar.</p>
+                                <p class="text-green-900"><b>Feriado (descansó):</b> era feriado y se quedó en casa — se paga por ley.</p>
+                            </div>
+                            <div class="rounded-md bg-amber-50 p-3">
+                                <div class="mb-1 font-bold text-amber-700">🟡 Vino en día especial (paga EXTRA)</div>
+                                <p class="text-amber-900"><b>Trabajó sábado:</b> vino un sábado que no le tocaba.</p>
+                                <p class="text-amber-900"><b>Trabajó domingo:</b> vino en su descanso dominical.</p>
+                                <p class="text-amber-900"><b>Trabajó feriado:</b> vino en feriado — cobra el día más la sobretasa.</p>
+                                <p class="mt-1 text-amber-800">💡 El monto extra de estos días se registra en <b>«Bonos y pagos extra»</b>.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Filtros -->
                 <div class="flex flex-wrap items-end gap-3 rounded-lg bg-white p-4 shadow-sm">
                     <div>
@@ -120,36 +183,9 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                     <div v-if="feriado" class="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm font-medium text-amber-900">
                         🎉 <b>Hoy es feriado: {{ feriado }}.</b> A los que descansaron márcalos <b>"Feriado (descansó)"</b>; a los que vinieron a trabajar, <b>"Trabajó feriado (paga extra)"</b>.
                     </div>
-                    <div class="rounded-lg bg-blue-50 p-4 text-sm text-blue-800">
-                        Todos aparecen como <b>Presente</b> por defecto. Pon la <b>hora de entrada/salida</b> (la tardanza se calcula sola contra la hora de entrada del turno, al minuto exacto), o cambia el estado a quien faltó. Marca <b>HE aprob.</b> solo si el supervisor aprobó las horas extra. Luego guarda.
-                        <details class="mt-2">
-                            <summary class="cursor-pointer font-semibold text-blue-900 hover:underline">📖 ¿Qué significa cada estado? (clic para ver)</summary>
-                            <div class="mt-3 grid grid-cols-1 gap-4 text-xs md:grid-cols-3">
-                                <div class="rounded-md bg-red-50 p-3">
-                                    <div class="mb-1 font-bold text-red-700">🔴 Descuentan el día (no se paga)</div>
-                                    <p class="text-red-900"><b>Falta:</b> no vino y no justificó.</p>
-                                    <p class="text-red-900"><b>Licencia sin goce:</b> permiso acordado pero sin pago.</p>
-                                </div>
-                                <div class="rounded-md bg-green-50 p-3">
-                                    <div class="mb-1 font-bold text-green-700">🟢 El día se paga igual</div>
-                                    <p class="text-green-900"><b>Falta justificada:</b> justificación aceptada.</p>
-                                    <p class="text-green-900"><b>Vacaciones:</b> goce vacacional.</p>
-                                    <p class="text-green-900"><b>Licencia con goce:</b> permiso pagado por ley (fallecimiento, paternidad…).</p>
-                                    <p class="text-green-900"><b>Descanso médico:</b> incapacidad con certificado (primeros 20 días/año los paga la empresa).</p>
-                                    <p class="text-green-900"><b>Subsidio:</b> desde el día 21 lo paga EsSalud.</p>
-                                    <p class="text-green-900"><b>Descanso:</b> su día libre de la semana (ej. rotativo de vigilancia).</p>
-                                    <p class="text-green-900"><b>Licencia hijo enfermo:</b> ley de cuidado familiar.</p>
-                                    <p class="text-green-900"><b>Feriado (descansó):</b> era feriado y se quedó en casa — se paga por ley.</p>
-                                </div>
-                                <div class="rounded-md bg-amber-50 p-3">
-                                    <div class="mb-1 font-bold text-amber-700">🟡 Vino en día especial (paga EXTRA)</div>
-                                    <p class="text-amber-900"><b>Trabajó sábado:</b> vino un sábado que no le tocaba.</p>
-                                    <p class="text-amber-900"><b>Trabajó domingo:</b> vino en su descanso dominical.</p>
-                                    <p class="text-amber-900"><b>Trabajó feriado:</b> vino en feriado — cobra el día más la sobretasa.</p>
-                                    <p class="mt-1 text-amber-800">💡 El monto extra de estos días se registra en <b>«Bonos y pagos extra»</b>.</p>
-                                </div>
-                            </div>
-                        </details>
+                    <div v-if="turnos.length" class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border-2 border-indigo-200 bg-indigo-50 px-4 py-3 text-sm">
+                        <span class="font-bold text-indigo-900">🕒 Turnos:</span>
+                        <span v-for="t in turnos" :key="t.id" class="rounded-full border border-indigo-300 bg-white px-3 py-1 font-medium text-indigo-800">{{ t.nombre }}</span>
                     </div>
 
                     <div class="overflow-x-auto bg-white shadow-sm sm:rounded-lg">
@@ -163,7 +199,7 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                                     <th class="px-4 py-3 w-28">Entrada</th>
                                     <th class="px-4 py-3 w-28">Salida</th>
                                     <th class="px-4 py-3 w-28">Tardanza (min)</th>
-                                    <th class="px-4 py-3 w-28">Horas extra</th>
+                                    <th class="px-4 py-3 w-28">Horas extra (min)</th>
                                     <th class="px-4 py-3 w-20 text-center">HE aprob.</th>
                                     <th class="px-4 py-3">Observación</th>
                                 </tr>
@@ -179,14 +215,20 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                                         <span v-else class="rounded-full bg-red-50 px-2 py-1 text-xs font-semibold text-red-600" title="Sin turno asignado: no se puede calcular la tardanza automáticamente">sin turno</span>
                                     </td>
                                     <td class="px-4 py-2">
-                                        <select v-model="f.estado" @change="recalc(f)" :class="inp">
+                                        <select v-model="f.estado" @change="onEstadoChange(f)" :class="inp">
                                             <option v-for="(label, key) in estados" :key="key" :value="key">{{ label }}</option>
                                         </select>
                                     </td>
                                     <td class="px-4 py-2"><input v-model="f.entrada" @input="recalc(f)" type="time" :disabled="!trabajado(f.estado)" :class="[inp, !trabajado(f.estado) && 'bg-gray-100']" /></td>
                                     <td class="px-4 py-2"><input v-model="f.salida" @input="recalc(f)" type="time" :disabled="!trabajado(f.estado)" :class="[inp, !trabajado(f.estado) && 'bg-gray-100']" /></td>
-                                    <td class="px-4 py-2"><input v-model.number="f.minutos_tarde" type="number" min="0" max="600" :disabled="!trabajado(f.estado) || !!f.entrada" :title="f.entrada ? 'Se calcula solo desde la hora de entrada' : ''" :class="[inp, (!trabajado(f.estado) || !!f.entrada) && 'bg-gray-100']" /></td>
-                                    <td class="px-4 py-2"><input v-model.number="f.horas_extra" type="number" min="0" max="12" step="0.5" :disabled="!trabajado(f.estado) || !!f.salida" :title="f.salida ? 'Se calcula solo desde la hora de salida' : ''" :class="[inp, (!trabajado(f.estado) || !!f.salida) && 'bg-gray-100']" /></td>
+                                    <td class="px-4 py-2">
+                                        <input v-model.number="f.minutos_tarde" type="number" min="0" max="600" :disabled="!trabajado(f.estado) || !!f.entrada" :title="f.entrada ? 'Se calcula solo desde la hora de entrada' : ''" :class="[inp, (!trabajado(f.estado) || !!f.entrada) && 'bg-gray-100']" />
+                                        <span v-if="f.minutos_tarde" class="mt-0.5 block text-xs text-gray-400">{{ minTexto(f.minutos_tarde) }}</span>
+                                    </td>
+                                    <td class="px-4 py-2">
+                                        <input :value="horasExtraMin(f)" @input="setHorasExtraMin(f, $event.target.valueAsNumber || 0)" type="number" min="0" max="720" :disabled="!trabajado(f.estado) || !!f.salida" :title="f.salida ? 'Se calcula solo desde la hora de salida' : ''" :class="[inp, (!trabajado(f.estado) || !!f.salida) && 'bg-gray-100']" />
+                                        <span v-if="horasExtraMin(f)" class="mt-0.5 block text-xs text-gray-400">{{ minTexto(horasExtraMin(f)) }}</span>
+                                    </td>
                                     <td class="px-4 py-2 text-center"><input v-model="f.horas_extra_aprobadas" type="checkbox" :disabled="!trabajado(f.estado) || !f.horas_extra" class="rounded" /></td>
                                     <td class="px-4 py-2"><input v-model="f.observacion" type="text" maxlength="255" :class="inp" placeholder="opcional" /></td>
                                 </tr>

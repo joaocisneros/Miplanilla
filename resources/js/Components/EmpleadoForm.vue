@@ -1,6 +1,6 @@
 <script setup>
 import { useForm } from '@inertiajs/vue3';
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 
 const props = defineProps({
     empresas: { type: Array, default: () => [] },
@@ -13,6 +13,7 @@ const props = defineProps({
     contrato: { type: Object, default: null },
     derechohabientes: { type: Array, default: () => [] },
     empresaIdInicial: { default: '' },
+    modalidadInicial: { type: String, default: '' },
     modo: { type: String, default: 'create' }, // create | edit
 });
 
@@ -53,7 +54,7 @@ const c = props.contrato ?? {};
 const form = useForm({
     empresa_id: e.empresa_id ?? props.empresaIdInicial ?? '',
     // Modalidad: 'planilla' (empleado 5ta) u 'honorarios' (RxH 4ta)
-    modalidad: e.modalidad ?? 'planilla',
+    modalidad: e.modalidad ?? (props.modalidadInicial || 'planilla'),
     // Datos personales
     apellido_paterno: e.apellido_paterno ?? '',
     apellido_materno: e.apellido_materno ?? '',
@@ -159,8 +160,19 @@ function quitarDH(i) {
     form.derechohabientes.splice(i, 1);
 }
 
+function irAlPrimerError() {
+    nextTick(() => {
+        for (const el of document.querySelectorAll('.text-red-600')) {
+            if (el.textContent.trim()) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                break;
+            }
+        }
+    });
+}
+
 function enviar() {
-    const opts = { onSuccess: () => emit('guardado') };
+    const opts = { onSuccess: () => emit('guardado'), onError: irAlPrimerError };
     if (props.modo === 'edit') {
         form.put(route('empleados.update', props.empleado.id), opts);
     } else {

@@ -49,6 +49,26 @@ const sel = ref(null);
 const form = useForm({ empresa_id: '', employee_id: '', filas: [] });
 const trabajado = (e) => ['NORMAL','TRABAJO_SABADO','TRABAJO_DOMINGO','TRABAJO_FERIADO'].includes(e);
 const diaSemana = (f) => ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'][new Date(f + 'T00:00:00').getDay()];
+// El backend/planilla usa horas_extra en horas decimales; en pantalla se escribe en minutos.
+const horasExtraMin = (d) => (d.horas_extra ? Math.round(d.horas_extra * 60) : 0);
+function setHorasExtraMin(d, min) {
+    d.horas_extra = min ? Math.round((min / 60) * 100) / 100 : 0;
+}
+const minTexto = (min) => (min ? `${Math.floor(min / 60)}h ${min % 60}min` : '');
+// Categoría del día según su estado, igual que la leyenda de Asistencia diaria:
+// rojo = descuenta el día, verde = se paga igual, ámbar = día especial que paga extra.
+const categoriaEstado = (estado) => {
+    if (['FALTA', 'LICENCIA_SIN_GOCE'].includes(estado)) return 'rojo';
+    if (['TRABAJO_SABADO', 'TRABAJO_DOMINGO', 'TRABAJO_FERIADO'].includes(estado)) return 'ambar';
+    if (estado !== 'NORMAL') return 'verde';
+    return '';
+};
+const filaClase = (estado) => ({ rojo: 'bg-red-50', ambar: 'bg-amber-50', verde: 'bg-emerald-50/60' }[categoriaEstado(estado)] || '');
+const estadoSelectClase = (estado) => ({
+    rojo: 'border-red-300 bg-red-50 text-red-900 font-medium',
+    ambar: 'border-amber-300 bg-amber-50 text-amber-900 font-medium',
+    verde: 'border-emerald-300 bg-emerald-50 text-emerald-900 font-medium',
+}[categoriaEstado(estado)] || '');
 
 function abrirDetalle(fila) {
     sel.value = fila;
@@ -174,24 +194,34 @@ const inp = 'block w-full rounded-md border-gray-300 text-sm';
         </div>
 
         <!-- Modal: días del trabajador (editable) -->
-        <CrudModal :show="mostrar" max-width="3xl" :titulo="sel ? sel.empleado : 'Detalle'" @close="mostrar = false">
+        <CrudModal :show="mostrar" max-width="5xl" :titulo="sel ? sel.empleado : 'Detalle'" @close="mostrar = false">
             <div v-if="sel" class="space-y-3">
-                <div v-if="sel.importado" class="rounded-md bg-emerald-50 p-3 text-sm text-emerald-800">
-                    📋 Datos del <b>cuadro resumen importado</b> de tu Excel: {{ sel.dias_trabajados }} días trabajados · {{ sel.faltas }} faltas · {{ sel.tardanza_min }} min tardanza · {{ sel.horas_extra }} h extra.
-                    No tiene detalle día por día (vino resumido). Para editar día por día, usa el registro diario.
+                <p v-if="sel.importado" class="text-sm text-gray-500">📋 Datos del <b>cuadro resumen importado</b> de tu Excel (sin detalle día por día). DNI {{ sel.documento }} · {{ meses[fMes - 1] }} {{ fAnio }}.</p>
+                <template v-else>
+                <p class="text-sm text-gray-500">DNI {{ sel.documento }} · {{ meses[fMes - 1] }} {{ fAnio }}. Cambia el estado, pon la tardanza en 0 si está justificada, y anota el motivo en Observación.</p>
+                <div class="flex flex-wrap gap-3 text-xs text-gray-500">
+                    <span class="flex items-center gap-1"><span class="h-3 w-3 rounded bg-red-50 border border-red-200"></span> Descuenta el día</span>
+                    <span class="flex items-center gap-1"><span class="h-3 w-3 rounded bg-emerald-50 border border-emerald-200"></span> Se paga igual</span>
+                    <span class="flex items-center gap-1"><span class="h-3 w-3 rounded bg-amber-50 border border-amber-200"></span> Día especial (paga extra)</span>
                 </div>
-                <p v-else class="text-sm text-gray-500">DNI {{ sel.documento }} · {{ meses[fMes - 1] }} {{ fAnio }}. Cambia el estado, pon la tardanza en 0 si está justificada, y anota el motivo en Observación.</p>
+                </template>
                 <div class="max-h-[55vh] overflow-y-auto">
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
                         <thead class="sticky top-0 bg-gray-50 text-left text-xs uppercase text-gray-500">
-                            <tr><th class="px-3 py-2">Fecha</th><th class="px-3 py-2 w-40">Estado</th><th class="px-3 py-2 w-24">Tard. (min)</th><th class="px-3 py-2 w-24">H. extra</th><th class="px-3 py-2">Observación</th></tr>
+                            <tr><th class="px-3 py-2">Fecha</th><th class="px-3 py-2 w-72">Estado</th><th class="px-3 py-2 w-24">Tard. (min)</th><th class="px-3 py-2 w-24">H.E. (min)</th><th class="px-3 py-2">Observación</th></tr>
                         </thead>
                         <tbody class="divide-y divide-gray-200">
-                            <tr v-for="(d, i) in form.filas" :key="i" :class="d.estado !== 'NORMAL' ? 'bg-amber-50/40' : ''">
+                            <tr v-for="(d, i) in form.filas" :key="i" :class="filaClase(d.estado)">
                                 <td class="px-3 py-2 whitespace-nowrap text-gray-700">{{ diaSemana(d.fecha) }} {{ d.fecha }}</td>
-                                <td class="px-3 py-2"><select v-model="d.estado" :class="inp"><option v-for="(label, key) in estados" :key="key" :value="key">{{ label }}</option></select></td>
-                                <td class="px-3 py-2"><input v-model.number="d.minutos_tarde" type="number" min="0" max="600" :disabled="!trabajado(d.estado)" :class="[inp, !trabajado(d.estado) && 'bg-gray-100']" /></td>
-                                <td class="px-3 py-2"><input v-model.number="d.horas_extra" type="number" min="0" max="12" step="0.5" :disabled="!trabajado(d.estado)" :class="[inp, !trabajado(d.estado) && 'bg-gray-100']" /></td>
+                                <td class="px-3 py-2"><select v-model="d.estado" :class="[inp, estadoSelectClase(d.estado)]"><option v-for="(label, key) in estados" :key="key" :value="key">{{ label }}</option></select></td>
+                                <td class="px-3 py-2">
+                                    <input v-model.number="d.minutos_tarde" type="number" min="0" max="600" :disabled="!trabajado(d.estado)" :class="[inp, !trabajado(d.estado) && 'bg-gray-100']" />
+                                    <span v-if="d.minutos_tarde" class="mt-0.5 block text-xs text-gray-400">{{ minTexto(d.minutos_tarde) }}</span>
+                                </td>
+                                <td class="px-3 py-2">
+                                    <input :value="horasExtraMin(d)" @input="setHorasExtraMin(d, $event.target.valueAsNumber || 0)" type="number" min="0" max="720" :disabled="!trabajado(d.estado)" :class="[inp, !trabajado(d.estado) && 'bg-gray-100']" />
+                                    <span v-if="horasExtraMin(d)" class="mt-0.5 block text-xs text-gray-400">{{ minTexto(horasExtraMin(d)) }}</span>
+                                </td>
                                 <td class="px-3 py-2"><input v-model="d.observacion" type="text" maxlength="255" :class="inp" placeholder="motivo / justificación" /></td>
                             </tr>
                             <tr v-if="form.filas.length === 0"><td colspan="5" class="px-3 py-6 text-center text-gray-500">Este trabajador no tiene días registrados en el mes.</td></tr>

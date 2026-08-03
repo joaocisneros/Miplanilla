@@ -4,7 +4,7 @@ import CrudModal from '@/Components/CrudModal.vue';
 import BotonAccion from '@/Components/BotonAccion.vue';
 import EmpleadoForm from '@/Components/EmpleadoForm.vue';
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 const props = defineProps({
     empleados: { type: Array, default: () => [] },
@@ -12,6 +12,8 @@ const props = defineProps({
     empresas: { type: Array, default: () => [] },
     sedes: { type: Array, default: () => [] },
     areas: Array, cargos: Array, turnos: Array, tiposContrato: Array,
+    modalidadFija: { type: String, default: null },
+    rutaIndex: { type: String, default: 'empleados.index' },
 });
 
 const permisos = computed(() => usePage().props.auth?.permissions ?? []);
@@ -34,7 +36,7 @@ const fSede = ref(props.filtros.sede_id ?? '');
 const sedesFiltro = computed(() => props.sedes.filter((s) => !fEmpresa.value || String(s.empresa_id) === String(fEmpresa.value)));
 
 function filtrar() {
-    router.get(route('empleados.index'), { empresa_id: fEmpresa.value || undefined, sede_id: fSede.value || undefined }, { preserveState: true, preserveScroll: true });
+    router.get(route(props.rutaIndex), { empresa_id: fEmpresa.value || undefined, sede_id: fSede.value || undefined }, { preserveState: true, preserveScroll: true });
 }
 function cambiarEmpresaFiltro() {
     fSede.value = '';
@@ -46,7 +48,11 @@ const q = ref('');
 const fArea = ref('');
 const fCargo = ref('');
 const fEstado = ref('activo');
-const fModalidad = ref('');
+const fModalidad = ref(props.modalidadFija || '');
+// "Empleados (Planilla)" y "Empleados (Honorarios)" reutilizan el mismo componente,
+// así que al navegar entre las dos hay que resincronizar el filtro fijo a mano
+// (si no, se queda con el valor de la página anterior y no muestra a nadie).
+watch(() => props.modalidadFija, (v) => { fModalidad.value = v || ''; });
 const areasUnicas = computed(() => [...new Set(props.empleados.map((e) => e.area).filter(Boolean))].sort());
 const cargosUnicos = computed(() => [...new Set(props.empleados.map((e) => e.cargo).filter(Boolean))].sort());
 const empleadosFiltrados = computed(() => props.empleados.filter((e) => {
@@ -135,11 +141,11 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
 </script>
 
 <template>
-    <Head title="Empleados" />
+    <Head :title="modalidadFija === 'honorarios' ? 'Empleados — Honorarios (RxH)' : modalidadFija === 'planilla' ? 'Empleados — Planilla' : 'Empleados'" />
     <AuthenticatedLayout>
         <template #header>
             <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold text-gray-800">Empleados</h2>
+                <h2 class="text-xl font-semibold text-gray-800">{{ modalidadFija === 'honorarios' ? 'Empleados — Honorarios (RxH)' : modalidadFija === 'planilla' ? 'Empleados — Planilla' : 'Empleados' }}</h2>
                 <button v-if="puedeGestionar" @click="abrirNuevo" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">+ Nuevo empleado</button>
             </div>
         </template>
@@ -180,7 +186,7 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                         <option value="cesado">Cesados</option>
                     </select>
                 </div>
-                <div class="min-w-0">
+                <div v-if="!modalidadFija" class="min-w-0">
                     <label class="block text-xs uppercase text-gray-500">Modalidad</label>
                     <select v-model="fModalidad" :class="selectCls" class="w-full">
                         <option value="">Todos</option>
@@ -203,14 +209,14 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
             <div class="overflow-x-auto bg-white shadow-sm sm:rounded-lg">
                 <table class="w-full min-w-[1160px] table-fixed divide-y divide-gray-200 text-sm">
                     <colgroup>
-                        <col class="w-[95px]" />
-                        <col class="w-[155px]" />
-                        <col class="w-[135px]" />
-                        <col class="w-[215px]" />
-                        <col class="w-[110px]" />
+                        <col class="w-[90px]" />
+                        <col class="w-[145px]" />
+                        <col class="w-[120px]" />
+                        <col class="w-[180px]" />
                         <col class="w-[105px]" />
-                        <col class="w-[80px]" />
-                        <col class="w-[330px]" />
+                        <col class="w-[100px]" />
+                        <col v-if="modalidadFija !== 'honorarios'" class="w-[140px]" />
+                        <col class="w-[280px]" />
                     </colgroup>
                     <thead class="bg-gray-50 text-left text-[11px] uppercase tracking-wide text-gray-500">
                         <tr>
@@ -220,7 +226,7 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                             <th class="px-3 py-2">Cargo</th>
                             <th class="px-3 py-2">Horario</th>
                             <th class="px-3 py-2">Sueldo</th>
-                            <th class="px-3 py-2">Pensión</th>
+                            <th v-if="modalidadFija !== 'honorarios'" class="px-3 py-2">Pensión</th>
                             <th class="px-3 py-2 text-right">Acciones</th>
                         </tr>
                     </thead>
@@ -241,7 +247,7 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                                 <span v-else class="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-600" title="Falta asignar turno/horario">⚠ Sin horario</span>
                             </td>
                             <td class="whitespace-nowrap px-3 py-2 text-[13px] tabular-nums text-gray-700">{{ money(emp.sueldo_basico) }}</td>
-                            <td class="whitespace-nowrap px-3 py-2 text-[13px] text-gray-700">
+                            <td v-if="modalidadFija !== 'honorarios'" class="px-3 py-2 text-[13px] leading-tight text-gray-700">
                                 {{ emp.sistema_pensiones ?? '—' }}
                                 <span v-if="emp.sistema_pensiones === 'JUBILADO' && emp.afp" class="text-[11px] text-gray-400" :title="'Antes de jubilarse correspondía a ' + emp.afp">(correspondía: {{ emp.afp === 'ONP' ? 'ONP' : 'AFP ' + emp.afp }})</span>
                             </td>
@@ -257,7 +263,7 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                             </td>
                         </tr>
                         <tr v-if="empleadosFiltrados.length === 0">
-                            <td colspan="8" class="px-4 py-6 text-center text-gray-500">No hay empleados con ese filtro/búsqueda.</td>
+                            <td :colspan="modalidadFija === 'honorarios' ? 7 : 8" class="px-4 py-6 text-center text-gray-500">No hay empleados con ese filtro/búsqueda.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -270,6 +276,7 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                     :key="formKey"
                     :empresas="empresas" :sedes="sedes" :areas="areas" :cargos="cargos" :turnos="turnos" :tipos-contrato="tiposContrato"
                     :empresa-id-inicial="fEmpresa"
+                    :modalidad-inicial="modalidadFija"
                     :empleado="seleccionado?.empleado ?? null"
                     :contrato="seleccionado?.contrato ?? null"
                     :derechohabientes="seleccionado?.derechohabientes ?? []"

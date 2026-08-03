@@ -41,7 +41,8 @@ const menu = computed(() => [
         titulo: 'Operación',
         items: [
             { label: 'Dashboard', icon: '🏠', route: 'dashboard', active: 'dashboard', show: true },
-            { label: 'Empleados', icon: '👥', route: 'empleados.index', active: 'empleados.*', show: can('empleados.ver') },
+            { label: 'Empleados (Planilla)', icon: '👥', route: 'empleados.index', active: 'empleados.index', show: can('empleados.ver') },
+            { label: 'Empleados (Honorarios)', icon: '🧾', route: 'empleados.honorarios', active: 'empleados.honorarios', show: can('empleados.ver') },
         ],
     },
     {
@@ -49,7 +50,7 @@ const menu = computed(() => [
         items: [
             { label: 'Asistencia diaria', icon: '🕒', route: 'asistencia.diario', active: 'asistencia.diario', show: can('asistencia.ver') && !esSoloEmpleado.value },
             { label: 'Consolidado de asistencia', icon: '📋', route: 'asistencia.resumen', active: 'asistencia.resumen', show: can('asistencia.ver') },
-            { label: 'Historial asistencia', icon: '📅', route: 'asistencia.index', active: 'asistencia.index', show: can('asistencia.ver') },
+            { label: 'Importar / Exportar asistencia', icon: '📅', route: 'asistencia.index', active: 'asistencia.index', show: can('asistencia.ver') },
         ],
     },
     {

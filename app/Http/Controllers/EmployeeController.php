@@ -52,12 +52,27 @@ class EmployeeController extends Controller
 
     public function index(Request $request): Response
     {
+        return $this->listado($request, 'planilla');
+    }
+
+    /**
+     * Misma lista de Empleados, pero fija en modalidad = honorarios (RxH).
+     * Javier pidió una página aparte para no tener que filtrar cada vez.
+     */
+    public function indexHonorarios(Request $request): Response
+    {
+        return $this->listado($request, 'honorarios');
+    }
+
+    private function listado(Request $request, ?string $modalidadFija = null): Response
+    {
         $empresaId = $request->input('empresa_id') ?: null;
         $sedeId = $request->input('sede_id') ?: null;
 
         $empleados = Employee::with(['empresa:id,razon_social,nombre_comercial', 'sede:id,nombre', 'contratoVigente.turno:id,nombre,hora_entrada,hora_salida', 'contratoVigente.area:id,nombre', 'contratoVigente.cargo:id,nombre', 'derechohabientes', 'documentos'])
             ->when($empresaId, fn ($q) => $q->where('empresa_id', $empresaId))
             ->when($sedeId, fn ($q) => $q->where('sede_id', $sedeId))
+            ->when($modalidadFija, fn ($q) => $q->where('modalidad', $modalidadFija))
             ->orderBy('apellido_paterno')
             ->get()
             ->map(function ($e) {
@@ -109,6 +124,8 @@ class EmployeeController extends Controller
             [
                 'empleados' => $empleados,
                 'filtros' => ['empresa_id' => $empresaId, 'sede_id' => $sedeId],
+                'modalidadFija' => $modalidadFija,
+                'rutaIndex' => $modalidadFija ? 'empleados.honorarios' : 'empleados.index',
             ],
             $this->datosFormulario()
         ));
@@ -178,7 +195,11 @@ class EmployeeController extends Controller
             }
         });
 
-        return redirect()->route('empleados.index')->with('success', 'Empleado registrado.');
+        // Vuelve al módulo correcto según la modalidad guardada (Planilla u Honorarios),
+        // no siempre a Planilla, para no "perder" al empleado de vista tras crearlo.
+        $ruta = ($data['empleado']['modalidad'] ?? 'planilla') === 'honorarios' ? 'empleados.honorarios' : 'empleados.index';
+
+        return redirect()->route($ruta)->with('success', 'Empleado registrado.');
     }
 
     public function update(Request $request, Employee $empleado)
@@ -199,7 +220,9 @@ class EmployeeController extends Controller
             }
         });
 
-        return redirect()->route('empleados.index')->with('success', 'Empleado actualizado.');
+        $ruta = ($data['empleado']['modalidad'] ?? 'planilla') === 'honorarios' ? 'empleados.honorarios' : 'empleados.index';
+
+        return redirect()->route($ruta)->with('success', 'Empleado actualizado.');
     }
 
     public function destroy(Employee $empleado)

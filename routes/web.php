@@ -45,6 +45,7 @@ Route::middleware('auth')->group(function () {
 
     // Empleados (RRHH/ADMIN gestionan; SUPERVISOR solo ve)
     Route::get('empleados', [EmployeeController::class, 'index'])->middleware('permission:empleados.ver')->name('empleados.index');
+    Route::get('empleados/honorarios', [EmployeeController::class, 'indexHonorarios'])->middleware('permission:empleados.ver')->name('empleados.honorarios');
     Route::get('empleados/export', [EmployeeController::class, 'export'])->middleware('permission:empleados.ver')->name('empleados.export');
     Route::get('empleados/consulta-dni/{dni}', [EmployeeController::class, 'consultaDni'])->middleware('permission:empleados.gestionar')->name('empleados.consultaDni');
     Route::get('empleados/{empleado}/ficha', [EmpleadoDocumentoController::class, 'ficha'])->middleware('permission:empleados.ver')->name('empleados.ficha');

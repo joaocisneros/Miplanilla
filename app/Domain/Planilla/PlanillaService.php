@@ -192,6 +192,18 @@ class PlanillaService
                     'descuento_faltas' => $descFaltas,
                     'remuneracion_periodo' => round($r['ingresos']['remuneracion_devengada'] + $descFaltas, 2),
                     'fuente' => $ag['fuente'] ?? 'diario',
+                    // Insumos base pedidos por el cliente para mostrarlos desglosados en pantalla.
+                    'sueldo_basico' => round((float) $contrato->sueldo_basico, 2),
+                    'asignacion_familiar' => round($asigFam, 2),
+                    // Movilidad MENSUAL (del contrato, sin prorratear) — para que sume bien
+                    // contra Sueldo base y Sueldo mensual, que también son montos del mes.
+                    // La movilidad PRORRATEADA de la quincena sigue aparte, en "ingresos.movilidad".
+                    'movilidad_mensual' => round($esHonorarios ? 0 : (float) $contrato->movilidad, 2),
+                    // "Sueldo mensual" = "TOTAL MENSUAL" del Excel del cliente: básico + asig.
+                    // familiar + movilidad (columna T = P+Q+R en su hoja; "por fuera" no
+                    // existe todavía en el sistema, se suma cuando se defina qué es).
+                    'sueldo_mensual' => round((float) $contrato->sueldo_basico + $asigFam + ($esHonorarios ? 0 : (float) $contrato->movilidad), 2),
+                    'valor_dia' => round($valorDia, 2),
                 ];
 
                 $payroll->detalles()->create([

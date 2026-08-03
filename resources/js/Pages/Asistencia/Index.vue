@@ -102,11 +102,11 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
 </script>
 
 <template>
-    <Head title="Asistencia" />
+    <Head title="Importar / Exportar asistencia" />
     <AuthenticatedLayout>
         <template #header>
             <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold text-gray-800">Historial de asistencia</h2>
+                <h2 class="text-xl font-semibold text-gray-800">Importar / Exportar asistencia</h2>
                 <a v-if="!esSoloEmpleado" :href="route('asistencia.diario')" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">Registro diario</a>
             </div>
         </template>

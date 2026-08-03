@@ -10,15 +10,19 @@ defineProps({
 });
 const money = (v) => 'S/ ' + Number(v ?? 0).toLocaleString('es-PE', { minimumFractionDigits: 2 });
 
-// Desglose de "Movilidad y extras" para el tooltip de la celda.
-const desgloseMov = (d) => {
+// Movilidad sola (se junta con Sueldo base) vs. "extras" (sábados/domingos/HE/bonos) aparte.
+const extras = (d) => {
+    const ing = d?.desglose?.ingresos ?? {};
+    return Number(ing.sabado || 0) + Number(ing.domingo_feriado || 0) + Number(ing.horas_extra || 0) + Number(ing.incentivos || 0);
+};
+const desgloseExtras = (d) => {
     const ing = d?.desglose?.ingresos ?? {};
     const partes = [
-        ['Movilidad', ing.movilidad], ['Sábados', ing.sabado], ['Dom/Fer', ing.domingo_feriado],
+        ['Sábados', ing.sabado], ['Dom/Fer', ing.domingo_feriado],
         ['H. extra', ing.horas_extra], ['Bono/Comisión', ing.incentivos],
     ].filter(([, v]) => Number(v || 0) !== 0)
         .map(([n, v]) => `${n}: S/ ${Number(v).toFixed(2)}`);
-    return partes.length ? partes.join('  ·  ') : 'Sin movilidad ni extras este periodo';
+    return partes.length ? partes.join('  ·  ') : 'Sin extras este periodo';
 };
 
 const aportesTotal = (d) => Object.values(d?.desglose?.aportes_empleador ?? {}).reduce((s, v) => s + Number(v || 0), 0);
@@ -68,17 +72,50 @@ function verDetalle(d) {
                 <div class="overflow-x-auto bg-white shadow-sm sm:rounded-lg">
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
                         <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
-                            <tr><th class="px-4 py-3">Trabajador</th><th class="px-4 py-3">Sistema</th><th class="px-4 py-3">Pensión</th><th class="px-4 py-3">Base afecta</th><th class="px-4 py-3">Rem. neta quincenal</th><th class="px-4 py-3" title="Movilidad + sábados + domingos + horas extra + bonos">Movilidad y extras</th><th class="px-4 py-3">Renta 5ta</th><th class="px-4 py-3">Neto</th><th class="px-4 py-3 text-right">Acciones</th></tr>
+                            <tr>
+                                <th class="px-4 py-3">Trabajador</th>
+                                <th class="px-4 py-3">Sistema / Pensión</th>
+                                <th class="px-4 py-3" title="Sueldo base + Movilidad y extras (sábados, domingos, horas extra, bonos)">Sueldo base / Movilidad</th>
+                                <th class="px-4 py-3">Asig. familiar</th>
+                                <th class="px-4 py-3">Sueldo mensual</th>
+                                <th class="px-4 py-3" title="(Sueldo base + Asig. familiar) ÷ 30 × días trabajados">Días trab. / Pago</th>
+                                <th class="px-4 py-3">Desc. falta</th>
+                                <th class="px-4 py-3">Desc. tardanza</th>
+                                <th class="px-4 py-3" title="Sábados + domingos/feriados + horas extra + bonos">Extras</th>
+                                <th class="px-4 py-3">Renta 5ta</th>
+                                <th class="px-4 py-3" title="Base afecta − Pensión (sin movilidad/extras ni renta 5ta todavía)">Neto base</th>
+                                <th class="px-4 py-3">Neto a pagar</th>
+                                <th class="px-4 py-3 text-right">Acciones</th>
+                            </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-200">
                             <tr v-for="d in detalles" :key="d.id" class="hover:bg-gray-50">
                                 <td class="px-4 py-2 font-medium text-gray-900">{{ d.empleado }}</td>
-                                <td class="px-4 py-2"><span :class="d.sistema?.startsWith('AFP') ? 'bg-purple-100 text-purple-800' : 'bg-sky-100 text-sky-800'" class="rounded-full px-2 py-1 text-xs">{{ d.sistema }}</span></td>
-                                <td class="px-4 py-2 text-red-600">{{ money(d.pension_total) }}</td>
-                                <td class="px-4 py-2">{{ money(d.base_afecta) }}</td>
-                                <td class="px-4 py-2 font-medium">{{ money(d.rem_neta_quincenal) }}</td>
-                                <td class="px-4 py-2 text-amber-700 cursor-help" :title="desgloseMov(d)">{{ money(d.total_movilidad) }}</td>
+                                <td class="px-4 py-2">
+                                    <span :class="d.sistema?.startsWith('AFP') ? 'bg-purple-100 text-purple-800' : 'bg-sky-100 text-sky-800'" class="rounded-full px-2 py-1 text-xs">{{ d.sistema }}</span>
+                                    <span class="block text-xs text-red-600">{{ money(d.pension_total) }}</span>
+                                </td>
+                                <td class="px-4 py-2">
+                                    {{ money(d.desglose?.asistencia?.sueldo_basico) }}
+                                    <span class="block text-xs text-amber-700">+ {{ money(d.desglose?.asistencia?.movilidad_mensual) }} mov.</span>
+                                </td>
+                                <td class="px-4 py-2">{{ money(d.desglose?.asistencia?.asignacion_familiar) }}</td>
+                                <td class="px-4 py-2">{{ money(d.desglose?.asistencia?.sueldo_mensual) }}</td>
+                                <td class="px-4 py-2 font-medium text-emerald-700">
+                                    {{ money(d.desglose?.ingresos?.remuneracion_devengada) }}
+                                    <span class="block text-xs text-gray-400">{{ d.desglose?.asistencia?.dias_trabajados ?? 0 }} día(s) trab.</span>
+                                </td>
+                                <td class="px-4 py-2 text-red-600">
+                                    {{ money(d.desglose?.asistencia?.descuento_faltas) }}
+                                    <span class="block text-xs text-gray-400">{{ d.desglose?.asistencia?.faltas ?? 0 }} día(s)</span>
+                                </td>
+                                <td class="px-4 py-2 text-red-600">
+                                    {{ money(d.desglose?.descuentos?.tardanza) }}
+                                    <span class="block text-xs text-gray-400">{{ d.desglose?.asistencia?.minutos_tarde ?? 0 }} min</span>
+                                </td>
+                                <td class="px-4 py-2 text-amber-700 cursor-help" :title="desgloseExtras(d)">{{ money(extras(d)) }}</td>
                                 <td class="px-4 py-2 text-red-600">{{ money(d.renta_5ta) }}</td>
+                                <td class="px-4 py-2 text-gray-600">{{ money(d.rem_neta_quincenal) }}</td>
                                 <td class="px-4 py-2 font-semibold text-green-700">{{ money(d.neto) }}</td>
                                 <td class="px-4 py-2">
                                     <div class="flex items-center justify-end gap-2">

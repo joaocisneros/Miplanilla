@@ -120,6 +120,8 @@ class AsistenciaController extends Controller
             'estados' => $this->estadosDisponibles(),
             'empresas' => Empresa::where('activo', true)->orderBy('razon_social')->get(['id', 'razon_social', 'nombre_comercial']),
             'sedes' => Sede::where('activo', true)->orderBy('nombre')->get(['id', 'nombre', 'empresa_id']),
+            'turnos' => \App\Models\Turno::where('activo', true)->orderBy('nombre')
+                ->get(['id', 'nombre', 'hora_entrada', 'hora_salida', 'cruza_medianoche']),
         ]);
     }
 
