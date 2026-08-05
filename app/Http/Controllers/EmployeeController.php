@@ -151,6 +151,10 @@ class EmployeeController extends Controller
                 ->orWhereRaw("CONCAT(apellido_paterno,' ',COALESCE(apellido_materno,''),' ',nombres) like ?", ["%$q%"])))
             ->orderBy('apellido_paterno')->get();
 
+        // Honorarios (RxH) no aporta AFP/ONP, así que la columna "Pensión" no aplica —
+        // se arma un Excel aparte, sin esa columna y con el rótulo correcto del monto.
+        $esHonorarios = $modalidad === 'honorarios';
+
         $rows = [];
         foreach ($empleados as $e) {
             $c = $e->contratoVigente->first();
@@ -162,24 +166,33 @@ class EmployeeController extends Controller
             if ($cargo && $cargoN !== $cargo) {
                 continue;
             }
-            $rows[] = [
+            $fila = [
                 $e->empresa?->nombre_comercial ?: $e->empresa?->razon_social,
                 $e->numero_documento,
                 $e->nombre_completo,
                 $areaN ?? '',
                 $cargoN ?? '',
                 $c?->turno?->nombre ?? '',
-                $c?->sistema_pensiones ?? '',
-                $c?->sueldo_basico ? number_format((float) $c->sueldo_basico, 2, '.', '') : '',
-                $e->activo ? 'Activo' : 'Cesado',
             ];
+            if (! $esHonorarios) {
+                $fila[] = $c?->sistema_pensiones ?? '';
+            }
+            $fila[] = $c?->sueldo_basico ? number_format((float) $c->sueldo_basico, 2, '.', '') : '';
+            $fila[] = $e->activo ? 'Activo' : 'Cesado';
+            $rows[] = $fila;
         }
 
-        $headings = ['Empresa', 'DNI', 'Apellidos y nombres', 'Área', 'Cargo', 'Turno', 'Pensión', 'Sueldo básico', 'Estado'];
+        if ($esHonorarios) {
+            $headings = ['Empresa', 'DNI', 'Apellidos y nombres', 'Área', 'Cargo', 'Turno', 'Honorario mensual', 'Estado'];
+            $titulo = 'Padrón de trabajadores — Honorarios (RxH) — '.now()->format('d/m/Y');
+            $colDinero = 7;
+        } else {
+            $headings = ['Empresa', 'DNI', 'Apellidos y nombres', 'Área', 'Cargo', 'Turno', 'Pensión', 'Sueldo básico', 'Estado'];
+            $titulo = 'Padrón de empleados — '.now()->format('d/m/Y');
+            $colDinero = 8;
+        }
 
-        $titulo = 'Padrón de empleados — '.now()->format('d/m/Y');
-
-        return Excel::download(new ListadoExport($titulo, $headings, $rows, [8]), 'empleados_'.now()->format('Ymd_His').'.xlsx');
+        return Excel::download(new ListadoExport($titulo, $headings, $rows, [$colDinero]), 'empleados_'.now()->format('Ymd_His').'.xlsx');
     }
 
     public function store(Request $request)
