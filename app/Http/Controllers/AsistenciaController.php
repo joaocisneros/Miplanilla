@@ -302,7 +302,7 @@ class AsistenciaController extends Controller
 
         $esSabado = \Carbon\Carbon::parse($data['fecha'])->isSaturday();
 
-        DB::transaction(function () use ($data, $turnos) {
+        DB::transaction(function () use ($data, $turnos, $esSabado) {
             foreach ($data['filas'] as $f) {
                 // Solo guardamos tardanza/HE cuando corresponde a un día efectivamente trabajado.
                 $trabajado = in_array($f['estado'], ['NORMAL', 'TRABAJO_SABADO', 'TRABAJO_DOMINGO', 'TRABAJO_FERIADO'], true);
