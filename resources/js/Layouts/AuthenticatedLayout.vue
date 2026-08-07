@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import ApplicationLogo from '@/Components/ApplicationLogo.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
@@ -7,6 +7,21 @@ import PerfilModal from '@/Components/PerfilModal.vue';
 import { Link, usePage } from '@inertiajs/vue3';
 
 const page = usePage();
+
+// Toast flotante para el mensaje de éxito: se ve siempre (fixed), a diferencia
+// del banner de arriba que queda fuera de pantalla si el usuario hizo scroll.
+const toast = ref('');
+let toastTimer = null;
+// Se observa el objeto "flash" completo (no solo .success): Inertia lo reemplaza
+// en cada respuesta, así el aviso vuelve a salir aunque el texto sea idéntico
+// al de un guardado anterior (ej. guardar la misma fecha dos veces seguidas).
+watch(() => page.props.flash, (flash) => {
+    if (!flash?.success) return;
+    toast.value = '';
+    requestAnimationFrame(() => { toast.value = flash.success; });
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toast.value = ''; }, 4000);
+});
 // Modal de "Mi perfil"
 const mostrarPerfil = ref(false);
 // En pantallas grandes arranca abierto; en celular/tablet arranca cerrado (para ver el contenido).
@@ -214,6 +229,13 @@ const menu = computed(() => [
             <!-- Flash messages -->
             <div v-if="$page.props.flash?.success" class="mx-6 mt-4 rounded-md bg-green-50 px-4 py-3 text-sm text-green-800">{{ $page.props.flash.success }}</div>
             <div v-if="errorGeneral" class="mx-6 mt-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-800">{{ errorGeneral }}</div>
+
+            <!-- Toast flotante: se ve siempre, sin importar el scroll (el banner de arriba no) -->
+            <Transition enter-active-class="transition duration-200 ease-out" enter-from-class="opacity-0 translate-y-2" leave-active-class="transition duration-300 ease-in" leave-to-class="opacity-0">
+                <div v-if="toast" class="fixed right-6 top-20 z-50 flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white shadow-lg">
+                    ✅ {{ toast }}
+                </div>
+            </Transition>
 
             <!-- Header de página -->
             <div v-if="$slots.header" class="bg-white px-4 py-3 shadow-sm sm:px-5">

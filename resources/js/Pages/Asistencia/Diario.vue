@@ -1,7 +1,7 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, router, useForm } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 
 const props = defineProps({
     fecha: String,
@@ -16,6 +16,7 @@ const props = defineProps({
 
 const fEmpresa = ref(props.filtros.empresa_id ?? '');
 const fSede = ref(props.filtros.sede_id ?? '');
+const fModalidad = ref(props.filtros.modalidad ?? 'planilla');
 const fecha = ref(props.fecha);
 const mostrarEstados = ref(false);
 const sedesFiltro = computed(() => props.sedes.filter((s) => !fEmpresa.value || String(s.empresa_id) === String(fEmpresa.value)));
@@ -81,18 +82,47 @@ function recargar() {
     router.get(route('asistencia.diario'), {
         empresa_id: fEmpresa.value || undefined,
         sede_id: fSede.value || undefined,
+        modalidad: fModalidad.value,
         fecha: fecha.value,
     }, { preserveState: false });
 }
 function cambiarEmpresa() { fSede.value = ''; recargar(); }
+function cambiarModalidad(m) { fModalidad.value = m; recargar(); }
 
 function marcarTodosPresente() {
     form.filas.forEach((f) => { f.estado = 'NORMAL'; f.entrada = ''; f.salida = ''; f.minutos_tarde = 0; f.horas_extra = 0; f.horas_extra_aprobadas = false; });
 }
+
+// Resalta un momento las filas que sí cambiaron al guardar, para confirmar
+// visualmente cuáles se actualizaron sin mover el scroll.
+const baseline = ref(new Map(props.filas.map((f) => [f.employee_id, JSON.stringify(f)])));
+const resaltados = ref(new Set());
+let resaltadoTimer = null;
+
 function guardar() {
     form.empresa_id = fEmpresa.value;
     form.fecha = fecha.value;
-    form.post(route('asistencia.diario.guardar'), { preserveScroll: true });
+    form.post(route('asistencia.diario.guardar'), {
+        preserveScroll: true,
+        onSuccess: () => {
+            const cambiados = new Set();
+            form.filas.forEach((f) => {
+                const snap = JSON.stringify(f);
+                if (baseline.value.get(f.employee_id) !== snap) cambiados.add(f.employee_id);
+                baseline.value.set(f.employee_id, snap);
+            });
+            resaltados.value = cambiados;
+            clearTimeout(resaltadoTimer);
+            resaltadoTimer = setTimeout(() => { resaltados.value = new Set(); }, 3000);
+
+            if (cambiados.size) {
+                const primerId = [...cambiados][0];
+                nextTick(() => {
+                    document.querySelector(`[data-empleado-id="${primerId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                });
+            }
+        },
+    });
 }
 
 const inp = 'block w-full rounded-md border-gray-300 text-sm';
@@ -152,6 +182,26 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                     </div>
                 </div>
 
+                <!-- Modalidad: el cliente no quiere ver Planilla y Honorarios juntos -->
+                <div class="flex gap-2">
+                    <button
+                        type="button"
+                        @click="cambiarModalidad('planilla')"
+                        class="rounded-md px-4 py-2 text-sm font-semibold"
+                        :class="fModalidad === 'planilla' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'"
+                    >
+                        👷 Planilla
+                    </button>
+                    <button
+                        type="button"
+                        @click="cambiarModalidad('honorarios')"
+                        class="rounded-md px-4 py-2 text-sm font-semibold"
+                        :class="fModalidad === 'honorarios' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'"
+                    >
+                        🧾 Honorarios (RxH)
+                    </button>
+                </div>
+
                 <!-- Filtros -->
                 <div class="flex flex-wrap items-end gap-3 rounded-lg bg-white p-4 shadow-sm">
                     <div>
@@ -205,7 +255,7 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-200">
-                                <tr v-for="(f, i) in form.filas" :key="f.employee_id" :class="f.estado !== 'NORMAL' ? 'bg-amber-50/40' : ''">
+                                <tr v-for="(f, i) in form.filas" :key="f.employee_id" :data-empleado-id="f.employee_id" class="transition-colors duration-1000" :class="resaltados.has(f.employee_id) ? 'bg-emerald-200' : (f.estado !== 'NORMAL' ? 'bg-amber-50/40' : '')">
                                     <td class="whitespace-nowrap px-4 py-2 text-gray-600">{{ f.documento }}</td>
                                     <td class="px-4 py-2 font-medium text-gray-900">{{ f.empleado }}</td>
                                     <td class="px-4 py-2">

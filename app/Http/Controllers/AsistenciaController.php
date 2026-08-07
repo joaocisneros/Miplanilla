@@ -64,11 +64,14 @@ class AsistenciaController extends Controller
         $empresaId = $request->input('empresa_id') ?: null;
         $sedeId = $request->input('sede_id') ?: null;
         $fecha = $request->input('fecha', now()->toDateString());
+        // El cliente no quiere ver Planilla y Honorarios (RxH) juntos en la misma lista.
+        $modalidad = $request->input('modalidad', 'planilla');
 
         $filas = collect();
         if ($empresaId) {
             $empleados = Employee::where('empresa_id', $empresaId)
                 ->where('activo', true)
+                ->where('modalidad', $modalidad)
                 ->when($sedeId, fn ($q) => $q->where('sede_id', $sedeId))
                 ->orderBy('apellido_paterno')
                 ->get(['id', 'apellido_paterno', 'apellido_materno', 'nombres', 'numero_documento']);
@@ -116,7 +119,7 @@ class AsistenciaController extends Controller
             'fecha' => $fecha,
             'feriado' => \App\Models\Feriado::whereDate('fecha', $fecha)->value('nombre'),
             'filas' => $filas,
-            'filtros' => ['empresa_id' => $empresaId, 'sede_id' => $sedeId],
+            'filtros' => ['empresa_id' => $empresaId, 'sede_id' => $sedeId, 'modalidad' => $modalidad],
             'estados' => $this->estadosDisponibles(),
             'empresas' => Empresa::where('activo', true)->orderBy('razon_social')->get(['id', 'razon_social', 'nombre_comercial']),
             'sedes' => Sede::where('activo', true)->orderBy('nombre')->get(['id', 'nombre', 'empresa_id']),
