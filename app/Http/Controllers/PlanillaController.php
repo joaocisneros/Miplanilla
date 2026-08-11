@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Domain\Planilla\PlanillaService;
 use App\Domain\Planilla\ValidadorAsistenciaPeriodo;
 use App\Exports\PlanillaDetalleExport;
+use App\Exports\PlanillaClienteExport;
 use App\Models\Empresa;
 use App\Models\Payroll;
 use App\Models\Periodo;
@@ -219,6 +220,89 @@ class PlanillaController extends Controller
      * adelantos, neto, aportes del empleador). Es el "extraíble a Excel" del cliente.
      */
     public function exportDetalle(Payroll $payroll)
+    {
+        @set_time_limit(180);
+        $payroll->load([
+            'periodo', 'empresa',
+            'detalles.employee:id,numero_documento,apellido_paterno,apellido_materno,nombres,fecha_nacimiento,genero',
+            'detalles.employee.contratoVigente.cargo:id,nombre',
+            'detalles.employee.contratoVigente.area:id,nombre',
+        ]);
+
+        $detalles = $payroll->detalles->filter(fn ($d) => ($d->modalidad ?? 'planilla') !== 'honorarios');
+        $n = fn ($v) => round((float) $v, 2);
+        $employeeIds = $detalles->pluck('employee_id')->all();
+        $resumenes = \App\Models\AsistenciaResumen::where('empresa_id', $payroll->empresa_id)
+            ->whereIn('employee_id', $employeeIds)
+            ->where('anio', $payroll->periodo->anio)->where('mes', $payroll->periodo->mes)
+            ->where('quincena', $payroll->periodo->quincena)->get()->keyBy('employee_id');
+        $estados = \App\Models\Attendance::where('empresa_id', $payroll->empresa_id)
+            ->whereIn('employee_id', $employeeIds)
+            ->whereBetween('fecha', [$payroll->periodo->fecha_inicio, $payroll->periodo->fecha_fin])
+            ->get()->groupBy('employee_id');
+
+        $rows = [];
+        $i = 1;
+        foreach ($detalles as $d) {
+            $e = $d->employee;
+            $c = $e?->contratoVigente->first();
+            $g = (array) $d->desglose;
+            $ing = $g['ingresos'] ?? [];
+            $desc = $g['descuentos'] ?? [];
+            $pen = $desc['pension'] ?? [];
+            $penDet = $pen['detalle'] ?? [];
+            $asis = $g['asistencia'] ?? [];
+            $ap = $g['aportes_empleador'] ?? [];
+            $sistemaBase = strtoupper((string) ($penDet['sistema'] ?? $c?->sistema_pensiones ?? ''));
+            $sistema = $sistemaBase === 'AFP' ? 'AFP '.($penDet['afp'] ?? $c?->afp ?? '') : $sistemaBase;
+            $resumen = $resumenes->get($d->employee_id);
+            $regs = $estados->get($d->employee_id, collect());
+            $contar = fn (string $estado) => $regs->where('estado', $estado)->count();
+            $vacDias = $resumen ? (int) $resumen->vacaciones : $contar('VACACIONES');
+            $licDias = $resumen ? (int) $resumen->licencia : $contar('LICENCIA');
+            $asigMensual = $n($asis['asignacion_familiar'] ?? 0);
+            $movMensual = $n($asis['movilidad_mensual'] ?? 0);
+            $porFuera = $n($c?->otros ?? 0);
+            $afpAporte = $n($pen['aporte'] ?? 0);
+            $afpComision = $n($pen['comision'] ?? 0);
+            $afpPrima = $n($pen['prima'] ?? 0);
+            $adelanto = $n($desc['adelantos'] ?? 0);
+
+            $rows[] = [
+                $i++, $e?->nombre_completo, $e?->fecha_nacimiento?->toDateString(), (string) $e?->numero_documento,
+                $c?->fecha_ingreso?->toDateString(), $c?->fecha_cese?->toDateString(),
+                ['M'=>'MASCULINO','F'=>'FEMENINO'][$e?->genero] ?? '',
+                \App\Support\TiposContrato::get($c?->tipo_contrato)['label'] ?? '',
+                strtoupper((string) ($c?->categoria_ocupacional ?? '')), $sistemaBase === 'ONP' ? 'SÍ' : '',
+                $c?->aporta_sctr ? 'SÍ' : 'NO', $c?->aporta_senati ? 'SÍ' : 'NO', $c?->codigo_afp ?? '',
+                $c?->area?->nombre ?? '', $c?->cargo?->nombre ?? '', $n($c?->sueldo_basico ?? 0),
+                $asigMensual, $movMensual, $porFuera,
+                $n(($c?->sueldo_basico ?? 0) + $asigMensual + $movMensual + $porFuera),
+                $asis['dias_trabajados'] ?? ($g['dias_trabajados'] ?? 0),
+                $contar('DESCANSO_MEDICO'), 0, $contar('SUBSIDIO'), $n($ing['subsidio'] ?? 0),
+                0, 0, 0, 0, $vacDias, $n($ing['vacaciones'] ?? 0), $n($ing['licencia'] ?? 0),
+                0, 0, 0, $licDias, 0, $contar('LICENCIA_HIJO_ENFERMO'), $n($ing['hijo_enfermo'] ?? 0),
+                $n((float) $d->base_afecta - (float) $d->pension_total), $n($g['bloques']['total_movilidad_quincenal'] ?? 0),
+                $asis['faltas'] ?? 0, $n($asis['descuento_faltas'] ?? 0),
+                $asis['minutos_tarde'] ?? 0, $n($desc['tardanza'] ?? 0), $n($g['reintegros'] ?? 0),
+                trim($sistema), $c?->tipo_afp ?? '', $n($penDet['tasa_comision'] ?? 0),
+                $sistemaBase === 'ONP' ? $afpAporte : 0,
+                $sistemaBase === 'AFP' ? $afpAporte : 0, $afpComision, $afpPrima,
+                $sistemaBase === 'AFP' ? $n($d->pension_total) : 0, $n($desc['renta_5ta'] ?? 0),
+                $n($ing['gratificacion'] ?? 0), $n($d->neto), $n($ap['essalud'] ?? 0),
+                $n($ap['sctr_pension'] ?? 0), $n($ap['sctr_salud'] ?? 0), $n($ap['vida_ley'] ?? 0),
+                $adelanto, 0,
+            ];
+        }
+
+        $nombre = 'planilla_detallada_'.Str::slug($payroll->empresa->razon_social).'_'.Str::slug($payroll->periodo->descripcion).'.xlsx';
+        $meses = [1=>'ENERO',2=>'FEBRERO',3=>'MARZO',4=>'ABRIL',5=>'MAYO',6=>'JUNIO',7=>'JULIO',8=>'AGOSTO',9=>'SETIEMBRE',10=>'OCTUBRE',11=>'NOVIEMBRE',12=>'DICIEMBRE'];
+        $titulo = 'GRATIFICACIÓN '.($meses[$payroll->periodo->mes] ?? '').' '.$payroll->periodo->anio;
+
+        return Excel::download(new PlanillaClienteExport($rows, $titulo), $nombre);
+    }
+
+    private function exportDetalleAnterior(Payroll $payroll)
     {
         @set_time_limit(180);
         $payroll->load([
