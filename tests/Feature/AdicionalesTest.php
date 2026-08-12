@@ -83,4 +83,22 @@ class AdicionalesTest extends TestCase
         $this->assertDatabaseCount('ingresos_adicionales', 1);
         $this->assertEquals(300.0, (float) IngresoAdicional::first()->bono);
     }
+
+    public function test_no_permite_guardar_un_empleado_de_otra_empresa(): void
+    {
+        $otraEmpresa = Empresa::create(['ruc' => '20100000002', 'razon_social' => 'OTRA EMPRESA']);
+        $otroEmpleado = Employee::create([
+            'empresa_id' => $otraEmpresa->id,
+            'apellido_paterno' => 'PEREZ', 'nombres' => 'ANA',
+            'tipo_documento' => 'DNI', 'numero_documento' => '22334455',
+        ]);
+
+        $this->actingAs($this->rrhh)->post('/adicionales', [
+            'empresa_id' => $this->empresa->id,
+            'anio' => 2026, 'mes' => 6, 'quincena' => 2,
+            'filas' => [['employee_id' => $otroEmpleado->id, 'bono' => 100]],
+        ])->assertSessionHasErrors('filas.0.employee_id');
+
+        $this->assertDatabaseCount('ingresos_adicionales', 0);
+    }
 }

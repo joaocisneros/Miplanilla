@@ -6,8 +6,9 @@ import { computed, ref, watch } from 'vue';
 
 const props = defineProps({
     periodos: { type: Array, default: () => [] },
-    filtros: { type: Object, default: () => ({ empresa_id: null }) },
+    filtros: { type: Object, default: () => ({ empresa_id: null, area_id: null }) },
     empresas: { type: Array, default: () => [] },
+    areas: { type: Array, default: () => [] },
 });
 
 const permisos = computed(() => usePage().props.auth?.permissions ?? []);
@@ -27,11 +28,19 @@ watch(
 // Filtros. Por defecto solo se ven los periodos ABIERTOS;
 // los cerrados se consultan eligiendo "Cerrados" (o "Todos").
 const fEmpresa = ref(props.filtros.empresa_id ?? '');
+const fArea = ref(props.filtros.area_id ?? '');
 const fEstado = ref('abiertos');
 const fMes = ref('');
 const fAnio = ref('');
 function filtrar() {
-    router.get(route('honorarios.index'), { empresa_id: fEmpresa.value || undefined }, { preserveState: true, preserveScroll: true });
+    router.get(route('honorarios.index'), {
+        empresa_id: fEmpresa.value || undefined,
+        area_id: fArea.value || undefined,
+    }, { preserveState: true, preserveScroll: true });
+}
+function cambiarEmpresa() {
+    fArea.value = '';
+    filtrar();
 }
 const aniosDisponibles = computed(() => [...new Set(props.periodos.map((p) => p.fecha_inicio?.substring(0, 4)))].filter(Boolean).sort().reverse());
 const periodosVisibles = computed(() =>
@@ -110,9 +119,16 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                 <div class="flex flex-wrap items-end gap-3 rounded-lg bg-white p-4 shadow-sm">
                     <div>
                         <label class="block text-xs uppercase text-gray-500">Empresa</label>
-                        <select v-model="fEmpresa" @change="filtrar" :class="selectCls">
+                        <select v-model="fEmpresa" @change="cambiarEmpresa" :class="selectCls">
                             <option value="">Todas las empresas</option>
                             <option v-for="e in empresas" :key="e.id" :value="e.id">{{ e.nombre_comercial || e.razon_social }}</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs uppercase text-gray-500">Área / grupo</label>
+                        <select v-model="fArea" @change="filtrar" :disabled="!fEmpresa" :class="[selectCls, !fEmpresa ? 'cursor-not-allowed bg-gray-100 text-gray-400' : '']">
+                            <option value="">{{ fEmpresa ? 'Todas las áreas' : 'Primero elige una empresa' }}</option>
+                            <option v-for="a in areas" :key="a.id" :value="a.id">{{ a.nombre }}</option>
                         </select>
                     </div>
                     <div>
@@ -155,8 +171,8 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                                 <td class="px-4 py-3">{{ money(p.total_neto) }}</td>
                                 <td class="px-4 py-3">
                                     <div class="flex items-center justify-end gap-2">
-                                        <Link :href="route('honorarios.show', p.payroll_id)" class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100">👁 Ver</Link>
-                                        <a :href="route('honorarios.excel', p.payroll_id)" class="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100" title="Descargar Excel">📥 Excel</a>
+                                        <Link :href="route('honorarios.show', { payroll: p.payroll_id, area_id: fArea || undefined })" class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100">👁 Ver</Link>
+                                        <a :href="route('honorarios.excel', { payroll: p.payroll_id, area_id: fArea || undefined })" class="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100" title="Descargar Excel">📥 Excel</a>
                                         <button v-if="puedeGenerar && p.estado !== 'cerrado'" @click="recalcular(p)" class="inline-flex items-center gap-1 rounded-md bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100" title="Recalcula TODO el periodo (planilla + honorarios)">↻ Recalcular</button>
                                         <button v-if="puedeCerrar && p.estado !== 'cerrado'" @click="cerrarPeriodo(p)" class="inline-flex items-center gap-1 rounded-md bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100" title="Cierra el periodo: ya no se podrá recalcular">🔒 Cerrar</button>
                                         <span v-if="p.estado === 'cerrado'" class="text-xs text-gray-400">🔒 Cerrado</span>

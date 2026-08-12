@@ -7,6 +7,8 @@ use App\Domain\Planilla\CalculadoraPlanilla;
 use App\Domain\Planilla\PlanillaService;
 use App\Domain\Tributario\Renta5taService;
 use App\Models\Attendance;
+use App\Models\Adelanto;
+use App\Models\AsistenciaResumen;
 use App\Models\Contract;
 use App\Models\Empresa;
 use App\Models\Employee;
@@ -99,5 +101,47 @@ class PlanillaServiceTest extends TestCase
 
         $payroll = $this->service()->generar($this->periodo);
         $this->assertEquals(0, $payroll->cantidad_empleados);
+    }
+
+    public function test_mensual_consolida_los_resumenes_de_ambas_quincenas(): void
+    {
+        $emp = $this->crearEmpleado(['sueldo_basico' => 3000, 'sistema_pensiones' => 'ONP']);
+        foreach ([[1, 14, 1, 10], [2, 13, 2, 20]] as [$q, $dias, $faltas, $tarde]) {
+            AsistenciaResumen::create([
+                'empresa_id' => $this->empresa->id, 'employee_id' => $emp->id,
+                'anio' => 2026, 'mes' => 6, 'quincena' => $q,
+                'dias_trabajados' => $dias, 'faltas' => $faltas, 'tardanza_min' => $tarde,
+            ]);
+        }
+        $mensual = Periodo::create([
+            'empresa_id' => $this->empresa->id, 'anio' => 2026, 'mes' => 7, 'quincena' => null,
+            'fecha_inicio' => '2026-07-01', 'fecha_fin' => '2026-07-31',
+        ]);
+        // Se trasladan los resúmenes al mes del periodo mensual de prueba.
+        AsistenciaResumen::query()->update(['mes' => 7]);
+
+        $detalle = $this->service()->generar($mensual)->detalles->first();
+
+        $this->assertEquals(27, $detalle->desglose['asistencia']['dias_trabajados']);
+        $this->assertEquals(3, $detalle->desglose['asistencia']['faltas']);
+        $this->assertEquals(30, $detalle->desglose['asistencia']['minutos_tarde']);
+    }
+
+    public function test_adelanto_mensual_solo_se_descuenta_en_segunda_quincena(): void
+    {
+        $emp = $this->crearEmpleado(['sueldo_basico' => 3000, 'sistema_pensiones' => 'ONP']);
+        Adelanto::create([
+            'empresa_id' => $this->empresa->id, 'employee_id' => $emp->id,
+            'tipo' => 'adelanto', 'anio' => 2026, 'mes' => 6, 'monto' => 200,
+        ]);
+        $primera = $this->service()->generar($this->periodo)->detalles->first();
+        $segundaPeriodo = Periodo::create([
+            'empresa_id' => $this->empresa->id, 'anio' => 2026, 'mes' => 6, 'quincena' => 2,
+            'fecha_inicio' => '2026-06-16', 'fecha_fin' => '2026-06-30',
+        ]);
+        $segunda = $this->service()->generar($segundaPeriodo)->detalles->first();
+
+        $this->assertEquals(0, $primera->desglose['descuentos']['adelantos']);
+        $this->assertEquals(200, $segunda->desglose['descuentos']['adelantos']);
     }
 }

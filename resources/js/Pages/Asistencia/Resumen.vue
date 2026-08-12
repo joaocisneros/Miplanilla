@@ -6,7 +6,7 @@ import { computed, ref } from 'vue';
 
 const props = defineProps({
     filas: { type: Array, default: () => [] },
-    filtros: { type: Object, default: () => ({ empresa_id: null, anio: null, mes: null }) },
+    filtros: { type: Object, default: () => ({ empresa_id: null, anio: null, mes: null, modalidad: null }) },
     estados: { type: Object, default: () => ({}) },
     empresas: { type: Array, default: () => [] },
 });
@@ -17,6 +17,7 @@ const fEmpresa = ref(props.filtros.empresa_id ?? '');
 const fAnio = ref(props.filtros.anio ?? new Date().getFullYear());
 const fMes = ref(props.filtros.mes ?? new Date().getMonth() + 1);
 const fQuincena = ref(props.filtros.quincena ?? '');
+const fModalidad = ref(props.filtros.modalidad ?? '');
 const anioActual = new Date().getFullYear();
 const anios = Array.from({ length: 6 }, (_, i) => anioActual + 1 - i);
 
@@ -39,7 +40,7 @@ const filasFiltradas = computed(() => {
 function filtrar() {
     router.get(route('asistencia.resumen'), {
         empresa_id: fEmpresa.value || undefined, anio: fAnio.value, mes: fMes.value,
-        quincena: fQuincena.value || undefined,
+        quincena: fQuincena.value || undefined, modalidad: fModalidad.value || undefined,
     }, { preserveState: true, preserveScroll: true });
 }
 
@@ -107,12 +108,20 @@ const inp = 'block w-full rounded-md border-gray-300 text-sm';
 
             <!-- Filtros -->
             <div class="rounded-lg bg-white p-4 shadow-sm">
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
                     <div class="lg:col-span-2">
                         <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Empresa</label>
                         <select v-model="fEmpresa" @change="filtrar" :class="ctrl">
                             <option value="">— Selecciona empresa —</option>
                             <option v-for="e in empresas" :key="e.id" :value="e.id">{{ e.nombre_comercial || e.razon_social }}</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Modalidad</label>
+                        <select v-model="fModalidad" @change="filtrar" :class="ctrl">
+                            <option value="">Todos</option>
+                            <option value="planilla">Planilla</option>
+                            <option value="honorarios">Honorarios (RxH)</option>
                         </select>
                     </div>
                     <div>
@@ -159,6 +168,7 @@ const inp = 'block w-full rounded-md border-gray-300 text-sm';
                         <tr>
                             <th class="whitespace-nowrap px-3 py-3">DNI</th>
                             <th class="whitespace-nowrap px-3 py-3">Trabajador</th>
+                            <th class="whitespace-nowrap px-3 py-3">Modalidad</th>
                             <th class="whitespace-nowrap px-2 py-3 text-center">Tardanza<br><span class="text-[10px] normal-case text-gray-400">(min)</span></th>
                             <th class="whitespace-nowrap px-2 py-3 text-center">H.E.<br><span class="text-[10px] normal-case text-gray-400">(min)</span></th>
                             <th class="whitespace-nowrap px-2 py-3 text-center">H.E.<br><span class="text-[10px] normal-case text-gray-400">(días)</span></th>
@@ -177,6 +187,11 @@ const inp = 'block w-full rounded-md border-gray-300 text-sm';
                                 <span v-if="f.importado" class="ml-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700" title="Datos del cuadro resumen importado de tu Excel">importado</span>
                                 <span v-else-if="f.con_datos" class="ml-1 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-semibold text-sky-700" title="Registrado en el sistema día por día">sistema</span>
                             </td>
+                            <td class="whitespace-nowrap px-3 py-2">
+                                <span :class="f.modalidad === 'honorarios' ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-100 text-indigo-700'" class="rounded-full px-2 py-1 text-[10px] font-semibold uppercase">
+                                    {{ f.modalidad === 'honorarios' ? 'RxH' : 'Planilla' }}
+                                </span>
+                            </td>
                             <td class="px-2 py-2 text-center"><span :class="f.tardanza_min ? 'font-semibold text-amber-600' : 'text-gray-300'">{{ f.tardanza_min }}</span></td>
                             <td class="px-2 py-2 text-center"><span :class="f.he_minutos ? 'font-semibold text-blue-600' : 'text-gray-300'">{{ f.he_minutos ?? 0 }}</span></td>
                             <td class="px-2 py-2 text-center"><span :class="f.he_dias ? 'font-semibold text-blue-600' : 'text-gray-300'">{{ f.he_dias ?? 0 }}</span></td>
@@ -187,7 +202,7 @@ const inp = 'block w-full rounded-md border-gray-300 text-sm';
                             <td class="px-2 py-2 text-center"><span :class="f.vacaciones ? 'font-semibold text-emerald-700' : 'text-gray-300'">{{ f.vacaciones ?? 0 }}</span></td>
                             <td class="whitespace-nowrap px-3 py-2 text-right"><span class="text-indigo-600">👁 Ver días</span></td>
                         </tr>
-                        <tr v-if="filasFiltradas.length === 0"><td colspan="11" class="px-4 py-6 text-center text-gray-500">Sin resultados.</td></tr>
+                        <tr v-if="filasFiltradas.length === 0"><td colspan="12" class="px-4 py-6 text-center text-gray-500">Sin resultados para la modalidad seleccionada.</td></tr>
                     </tbody>
                 </table>
             </div>

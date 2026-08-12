@@ -1,16 +1,22 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import CrudModal from '@/Components/CrudModal.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 
 const props = defineProps({
     payroll: { type: Object, required: true },
     filas: { type: Array, default: () => [] },
+    filtros: { type: Object, default: () => ({ area_id: null }) },
+    areas: { type: Array, default: () => [] },
 });
 
 const money = (v) => 'S/ ' + Number(v ?? 0).toLocaleString('es-PE', { minimumFractionDigits: 2 });
 const hayDatos = computed(() => props.filas.length > 0);
+const fArea = ref(props.filtros.area_id ?? '');
+function filtrarArea() {
+    router.get(route('honorarios.show', props.payroll.id), { area_id: fArea.value || undefined }, { preserveState: true });
+}
 
 function descargarRecibo(f) {
     window.location.href = route('honorarios.recibo', f.id);
@@ -33,17 +39,27 @@ const totalDescuentos = (f) => Number(f.desglose?.descuentos?.tardanza || 0) + N
         <template #header>
             <div class="flex items-center justify-between gap-3">
                 <div class="flex items-center gap-3">
-                    <Link :href="route('honorarios.index')" class="text-sm text-indigo-600">&larr; Honorarios</Link>
+                    <Link :href="route('honorarios.index', { area_id: fArea || undefined })" class="text-sm text-indigo-600">&larr; Honorarios</Link>
                     <h2 class="text-xl font-semibold text-gray-800">{{ payroll.descripcion }} — {{ payroll.empresa }}</h2>
                 </div>
                 <div class="flex items-center gap-2">
-                    <a :href="route('honorarios.excel', payroll.id)" class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">📥 Exportar Excel</a>
-                    <a :href="route('honorarios.recibos-zip', payroll.id)" class="rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700">⬇ Recibos (ZIP)</a>
+                    <a :href="route('honorarios.excel', { payroll: payroll.id, area_id: fArea || undefined })" class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">📥 Exportar Excel</a>
+                    <a :href="route('honorarios.recibos-zip', { payroll: payroll.id, area_id: fArea || undefined })" class="rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700">⬇ Recibos (ZIP)</a>
                 </div>
             </div>
         </template>
         <div class="p-6">
             <div class="space-y-4">
+                <div class="flex flex-wrap items-end gap-3 rounded-lg bg-white p-4 shadow-sm">
+                    <div>
+                        <label class="block text-xs uppercase text-gray-500">Área / grupo</label>
+                        <select v-model="fArea" @change="filtrarArea" class="rounded-md border-gray-300 py-1.5 text-sm">
+                            <option value="">Todas las áreas</option>
+                            <option v-for="a in areas" :key="a.id" :value="a.id">{{ a.nombre }}</option>
+                        </select>
+                    </div>
+                    <p class="text-xs text-gray-500">Este filtro también se aplica al Excel y al ZIP.</p>
+                </div>
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <div class="rounded-lg bg-white p-4 shadow-sm">
                         <div class="text-xs uppercase text-gray-500">Estado</div>
@@ -65,6 +81,7 @@ const totalDescuentos = (f) => Number(f.desglose?.descuentos?.tardanza || 0) + N
                         <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
                             <tr>
                                 <th class="px-3 py-3">Trabajador</th>
+                                <th class="px-3 py-3">Área</th>
                                 <th class="px-3 py-3 text-center">Días</th>
                                 <th class="px-3 py-3 text-center">Faltas</th>
                                 <th class="px-3 py-3 text-center">Tard. (min)</th>
@@ -80,6 +97,7 @@ const totalDescuentos = (f) => Number(f.desglose?.descuentos?.tardanza || 0) + N
                         <tbody class="divide-y divide-gray-200 [&_td]:whitespace-nowrap [&_td]:tabular-nums">
                             <tr v-for="(f, i) in filas" :key="i" class="hover:bg-gray-50">
                                 <td class="px-3 py-2 font-medium text-gray-900">{{ f.nombre }}<span class="block text-xs font-normal text-gray-400">{{ f.dni }}</span></td>
+                                <td class="px-3 py-2 text-gray-600">{{ f.area }}</td>
                                 <td class="px-3 py-2 text-center">{{ f.dias }}</td>
                                 <td class="px-3 py-2 text-center">{{ f.faltas }}</td>
                                 <td class="px-3 py-2 text-center">{{ f.tardanza_min }}</td>
@@ -96,11 +114,11 @@ const totalDescuentos = (f) => Number(f.desglose?.descuentos?.tardanza || 0) + N
                                     </div>
                                 </td>
                             </tr>
-                            <tr v-if="!hayDatos"><td colspan="11" class="px-4 py-6 text-center text-gray-500">No hay trabajadores por honorarios en esta planilla.</td></tr>
+                            <tr v-if="!hayDatos"><td colspan="12" class="px-4 py-6 text-center text-gray-500">No hay trabajadores por honorarios para el área seleccionada.</td></tr>
                         </tbody>
                         <tfoot v-if="hayDatos" class="bg-gray-100 font-bold [&_td]:whitespace-nowrap [&_td]:tabular-nums">
                             <tr>
-                                <td class="px-3 py-3" colspan="9">TOTAL NETO</td>
+                                <td class="px-3 py-3" colspan="10">TOTAL NETO</td>
                                 <td class="px-3 py-3 text-right text-emerald-800">{{ money(payroll.total_neto) }}</td>
                                 <td></td>
                             </tr>

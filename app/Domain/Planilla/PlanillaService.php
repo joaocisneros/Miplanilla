@@ -115,7 +115,9 @@ class PlanillaService
                 } // fin else (planilla)
 
                 // Adelantos / cuotas de préstamo a descontar en este periodo (mes).
-                $adelantos = (float) Adelanto::where('empresa_id', $periodo->empresa_id)
+                // El adelanto es mensual: se descuenta una sola vez. En esquema
+                // quincenal corresponde a la 2da quincena; en mensual, al cierre del mes.
+                $adelantos = $periodo->quincena === 1 ? 0.0 : (float) Adelanto::where('empresa_id', $periodo->empresa_id)
                     ->where('employee_id', $emp->id)
                     ->where('anio', $periodo->anio)
                     ->where('mes', $periodo->mes)
@@ -123,17 +125,23 @@ class PlanillaService
 
                 // Ingresos adicionales aprobados por el supervisor (horas extra + bonos).
                 // Las horas extra solo se pagan si el supervisor las APROBÓ; el bono siempre.
-                $adic = \App\Models\IngresoAdicional::where('empresa_id', $periodo->empresa_id)
+                $adicQuery = \App\Models\IngresoAdicional::where('empresa_id', $periodo->empresa_id)
                     ->where('employee_id', $emp->id)
                     ->where('anio', $periodo->anio)
-                    ->where('mes', $periodo->mes)
-                    ->where('quincena', $periodo->quincena)
-                    ->first();
-                $montoHorasAprob = ($adic && $adic->aprobado) ? (float) $adic->monto_horas : 0.0;
-                $sabadoAdic = $adic ? (float) $adic->sabado : 0.0;
-                $domingoAdic = $adic ? (float) $adic->domingo_feriado : 0.0;
-                $bonoAdic = $adic ? (float) $adic->bono : 0.0;
-                $otrosAfectosAdic = $adic ? (float) $adic->otros_afectos : 0.0;
+                    ->where('mes', $periodo->mes);
+                $adicionales = $periodo->quincena === null
+                    ? (clone $adicQuery)->whereNull('quincena')->get()
+                    : (clone $adicQuery)->where('quincena', $periodo->quincena)->get();
+                // Si el cierre mensual no tiene una carga mensual propia, consolida
+                // automáticamente las cargas de ambas quincenas.
+                if ($periodo->quincena === null && $adicionales->isEmpty()) {
+                    $adicionales = (clone $adicQuery)->whereIn('quincena', [1, 2])->get();
+                }
+                $montoHorasAprob = (float) $adicionales->filter(fn ($a) => $a->aprobado)->sum('monto_horas');
+                $sabadoAdic = (float) $adicionales->sum('sabado');
+                $domingoAdic = (float) $adicionales->sum('domingo_feriado');
+                $bonoAdic = (float) $adicionales->sum('bono');
+                $otrosAfectosAdic = (float) $adicionales->sum('otros_afectos');
 
                 $entrada = [
                     'modo' => $modoCalculo,
@@ -267,22 +275,27 @@ class PlanillaService
     private function agregarAsistencia(int $employeeId, Periodo $periodo, int $diasPeriodo): array
     {
         // 1) Si existe un CUADRO RESUMEN importado para este periodo, es la fuente exacta.
-        $resumen = \App\Models\AsistenciaResumen::where('empresa_id', $periodo->empresa_id)
+        $resumenQuery = \App\Models\AsistenciaResumen::where('empresa_id', $periodo->empresa_id)
             ->where('employee_id', $employeeId)
             ->where('anio', $periodo->anio)
-            ->where('mes', $periodo->mes)
-            ->where('quincena', $periodo->quincena)
-            ->first();
+            ->where('mes', $periodo->mes);
+        $resumenes = $periodo->quincena === null
+            ? (clone $resumenQuery)->whereNull('quincena')->get()
+            : (clone $resumenQuery)->where('quincena', $periodo->quincena)->get();
+        // Un mensual puede construirse con los dos resúmenes quincenales ya importados.
+        if ($periodo->quincena === null && $resumenes->isEmpty()) {
+            $resumenes = (clone $resumenQuery)->whereIn('quincena', [1, 2])->get();
+        }
 
-        if ($resumen) {
+        if ($resumenes->isNotEmpty()) {
             // Las horas extra NO se toman aquí: fluyen por IngresoAdicional (pantalla #7),
             // que ya las aprueba y valoriza. Así se evita contarlas dos veces.
             return [
-                'dias_trabajados' => (float) $resumen->dias_trabajados,
-                'minutos_tarde' => (int) $resumen->tardanza_min,
+                'dias_trabajados' => (float) $resumenes->sum('dias_trabajados'),
+                'minutos_tarde' => (int) $resumenes->sum('tardanza_min'),
                 'horas_extra_25' => 0.0,
                 'horas_extra_35' => 0.0,
-                'faltas' => (int) $resumen->faltas,
+                'faltas' => (int) $resumenes->sum('faltas'),
                 'fuente' => 'resumen',
             ];
         }

@@ -8,6 +8,7 @@ use App\Models\Employee;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -59,7 +60,8 @@ class AdelantoController extends Controller
     {
         $data = $request->validate([
             'empresa_id' => ['required', 'exists:empresas,id'],
-            'employee_id' => ['required', 'exists:employees,id'],
+            'employee_id' => ['required', Rule::exists('employees', 'id')
+                ->where(fn ($q) => $q->where('empresa_id', $request->input('empresa_id')))],
             'tipo' => ['required', 'in:adelanto,prestamo'],
             'anio' => ['required', 'integer', 'min:2000', 'max:2100'],
             'mes' => ['required', 'integer', 'min:1', 'max:12'],

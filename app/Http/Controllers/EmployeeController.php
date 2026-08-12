@@ -324,7 +324,7 @@ class EmployeeController extends Controller
             'percibe_asignacion_familiar' => ['boolean'],
             'movilidad' => ['nullable', 'numeric', 'min:0'],
             'otros' => ['nullable', 'numeric', 'min:0'],
-            'sistema_pensiones' => ['nullable', 'in:AFP,ONP,JUBILADO'],
+            'sistema_pensiones' => ['nullable', 'required_if:modalidad,planilla', 'in:AFP,ONP,JUBILADO'],
             'afp' => ['nullable', 'string', 'max:50', 'required_if:sistema_pensiones,AFP'],
             'tipo_afp' => ['nullable', 'in:mixta,sueldo', 'required_if:sistema_pensiones,AFP'],
             'codigo_afp' => ['nullable', 'string', 'max:50'],
@@ -356,12 +356,24 @@ class EmployeeController extends Controller
                 'cuenta_ahorros', 'cci', 'codigo_biometrico',
                 'emergencia_nombre', 'emergencia_telefono', 'emergencia_parentesco',
             ]),
-            'contrato' => $request->only([
+            'contrato' => array_merge($request->only([
                 'tipo_contrato', 'categoria_ocupacional', 'fecha_ingreso', 'fecha_cese', 'sueldo_basico',
                 'percibe_asignacion_familiar', 'movilidad', 'otros', 'sistema_pensiones', 'afp',
                 'tipo_afp', 'codigo_afp', 'fecha_afiliacion_pension', 'aporta_sctr', 'aporta_senati',
-                'tiene_vida_ley', 'area_id', 'cargo_id', 'turno_id', 'dia_descanso_fijo',
-            ]),
+                'tiene_vida_ley', 'retiene_4ta', 'area_id', 'cargo_id', 'turno_id', 'dia_descanso_fijo',
+            ]), $request->input('modalidad') === 'honorarios' ? [
+                'retiene_4ta' => false,
+                'sistema_pensiones' => null,
+                'afp' => null,
+                'tipo_afp' => null,
+                'codigo_afp' => null,
+                'fecha_afiliacion_pension' => null,
+                'percibe_asignacion_familiar' => false,
+                'aporta_sctr' => false,
+                'aporta_senati' => false,
+                'tiene_vida_ley' => false,
+                'movilidad' => 0,
+            ] : []),
             'derechohabientes' => $request->input('derechohabientes', []),
         ];
     }

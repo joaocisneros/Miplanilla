@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Domain\Planilla\PlanillaService;
 use App\Domain\Planilla\ValidadorAsistenciaPeriodo;
 use App\Exports\PlanillaDetalleExport;
+use App\Models\Area;
 use App\Models\Empresa;
 use App\Models\Payroll;
 use App\Models\PayrollDetail;
@@ -27,15 +28,20 @@ class HonorarioController extends Controller
     public function index(Request $request): Response
     {
         $empresaId = $request->input('empresa_id') ?: null;
+        $areaId = $request->integer('area_id') ?: null;
+        $areaNombre = $areaId ? Area::find($areaId)?->nombre : null;
 
-        $periodos = Payroll::with(['periodo', 'empresa:id,razon_social,nombre_comercial', 'detalles'])
+        $periodos = Payroll::with(['periodo', 'empresa:id,razon_social,nombre_comercial', 'detalles.employee.contratoVigente'])
             ->when($empresaId, fn ($q) => $q->where('empresa_id', $empresaId))
             ->get()
-            ->map(function ($p) {
+            ->map(function ($p) use ($areaNombre) {
                 // Modalidad congelada en el detalle, no la actual del empleado.
                 // Solo cuentan los que trabajaron (con dias o con pago): un RxH activo
                 // que no trabajo el periodo no aparece ni suma.
                 $dets = $p->detalles->filter(fn ($d) => ($d->modalidad ?? 'planilla') === 'honorarios')
+                    ->when($areaNombre, fn ($items) => $items->filter(
+                        fn ($d) => mb_strtoupper(trim((string) $d->employee?->contratoVigente->first()?->area?->nombre)) === mb_strtoupper(trim($areaNombre))
+                    ))
                     ->filter(fn ($d) => (float) $d->neto != 0.0 || (($d->desglose['asistencia']['dias_trabajados'] ?? 0) > 0));
                 if ($dets->isEmpty()) {
                     return null;
@@ -58,18 +64,27 @@ class HonorarioController extends Controller
 
         return Inertia::render('Honorarios/Index', [
             'periodos' => $periodos,
-            'filtros' => ['empresa_id' => $empresaId],
+            'filtros' => ['empresa_id' => $empresaId, 'area_id' => $areaId],
             'empresas' => Empresa::where('activo', true)->orderBy('razon_social')
                 ->get(['id', 'razon_social', 'nombre_comercial']),
+            // Un área pertenece a una empresa. No se mezclan las áreas de todas
+            // las empresas porque pueden compartir nombres (Ventas, Producción, etc.).
+            'areas' => $empresaId
+                ? Area::where('activo', true)->where('empresa_id', $empresaId)
+                    ->orderBy('nombre')->get(['id', 'empresa_id', 'nombre'])
+                    ->unique(fn ($area) => mb_strtoupper(trim($area->nombre)))->values()
+                : [],
         ]);
     }
 
     /** Detalle por trabajador de una planilla (payroll) concreta, solo honorarios. */
-    public function show(Payroll $payroll): Response
+    public function show(Request $request, Payroll $payroll): Response
     {
-        $payroll->load(['periodo', 'empresa:id,razon_social', 'detalles.employee']);
+        $areaId = $request->integer('area_id') ?: null;
+        $areaNombre = $areaId ? Area::find($areaId)?->nombre : null;
+        $payroll->load(['periodo', 'empresa:id,razon_social', 'detalles.employee.contratoVigente.area:id,nombre']);
 
-        $filas = $this->filasDe($payroll);
+        $filas = $this->filasDe($payroll, $areaNombre);
 
         return Inertia::render('Honorarios/Show', [
             'payroll' => [
@@ -81,6 +96,10 @@ class HonorarioController extends Controller
                 'cantidad_empleados' => $filas->count(),
             ],
             'filas' => $filas,
+            'filtros' => ['area_id' => $areaId],
+            'areas' => Area::where('empresa_id', $payroll->empresa_id)->where('activo', true)
+                ->orderBy('nombre')->get(['id', 'nombre'])
+                ->unique(fn ($area) => mb_strtoupper(trim($area->nombre)))->values(),
         ]);
     }
 
@@ -198,29 +217,32 @@ class HonorarioController extends Controller
     }
 
     /** Exporta a Excel el detalle de honorarios de una planilla (payroll) concreta. */
-    public function export(Payroll $payroll)
+    public function export(Request $request, Payroll $payroll)
     {
-        $payroll->load(['periodo', 'empresa:id,razon_social', 'detalles.employee']);
-        $filas = $this->filasDe($payroll);
+        $areaId = $request->integer('area_id') ?: null;
+        $areaNombre = $areaId ? Area::find($areaId)?->nombre : null;
+        $payroll->load(['periodo', 'empresa:id,razon_social', 'detalles.employee.contratoVigente.area:id,nombre']);
+        $filas = $this->filasDe($payroll, $areaNombre);
 
         // Mismo criterio que el detallado de planilla: el descuento de la tardanza
         // al costado de sus minutos, y todos los montos que componen el neto visibles.
-        $headings = ['N°', 'DNI', 'Apellidos y Nombres', 'Días trab.', 'Faltas', 'Tardanza (min)', 'Desc. tardanza',
+        $headings = ['N°', 'DNI', 'Apellidos y Nombres', 'Área', 'Días trab.', 'Faltas', 'Tardanza (min)', 'Desc. tardanza',
             'Honorario', 'Sábados', 'Dom/Fer', 'H. extra', 'Bonos', 'Adelantos', 'NETO A PAGAR'];
         $rows = [];
         $i = 1;
         foreach ($filas as $f) {
             $g = $f['desglose'] ?? [];
-            $rows[] = [$i++, $f['dni'], $f['nombre'], $f['dias'], $f['faltas'], $f['tardanza_min'],
+            $rows[] = [$i++, $f['dni'], $f['nombre'], $f['area'], $f['dias'], $f['faltas'], $f['tardanza_min'],
                 round((float) ($g['descuentos']['tardanza'] ?? 0), 2),
                 $f['honorario'], $f['sabado'], $f['domingo'], $f['horas_extra'], $f['bono'],
                 round((float) ($g['descuentos']['adelantos'] ?? 0), 2),
                 $f['neto']];
         }
-        $moneyCols = [7, 8, 9, 10, 11, 12, 13, 14];
-        $nombre = 'honorarios_'.\Illuminate\Support\Str::slug($payroll->empresa->razon_social).'_'.\Illuminate\Support\Str::slug($payroll->periodo->descripcion).'.xlsx';
+        $moneyCols = [8, 9, 10, 11, 12, 13, 14, 15];
+        $areaSlug = $areaId ? '_'.\Illuminate\Support\Str::slug($filas->first()['area'] ?? 'area') : '';
+        $nombre = 'honorarios_'.\Illuminate\Support\Str::slug($payroll->empresa->razon_social).'_'.\Illuminate\Support\Str::slug($payroll->periodo->descripcion).$areaSlug.'.xlsx';
 
-        return Excel::download(new PlanillaDetalleExport($headings, $rows, $moneyCols, 14, 'D2'), $nombre);
+        return Excel::download(new PlanillaDetalleExport($headings, $rows, $moneyCols, 15, 'E2'), $nombre);
     }
 
     /** Descarga el recibo por honorarios (PDF) de un trabajador. */
@@ -243,9 +265,14 @@ class HonorarioController extends Controller
         // El ZIP masivo (todos los trabajadores) no es para un usuario EMPLEADO.
         abort_if($request->user()->esSoloEmpleado(), 403);
 
-        $payroll->load(['periodo', 'empresa:id,razon_social', 'detalles.employee']);
+        $areaId = $request->integer('area_id') ?: null;
+        $areaNombre = $areaId ? Area::find($areaId)?->nombre : null;
+        $payroll->load(['periodo', 'empresa:id,razon_social', 'detalles.employee.contratoVigente.area:id,nombre']);
 
         $detalles = $payroll->detalles->filter(fn ($d) => ($d->modalidad ?? 'planilla') === 'honorarios')
+            ->when($areaNombre, fn ($items) => $items->filter(
+                fn ($d) => mb_strtoupper(trim((string) $d->employee?->contratoVigente->first()?->area?->nombre)) === mb_strtoupper(trim($areaNombre))
+            ))
             ->filter(fn ($d) => (float) $d->neto > 0); // sin pago = sin recibo
 
         if ($detalles->isEmpty()) {
@@ -263,25 +290,32 @@ class HonorarioController extends Controller
         $zip->close();
 
         $slug = \Illuminate\Support\Str::slug($payroll->empresa->razon_social);
-        $nombre = "recibos_honorarios_{$slug}_{$payroll->periodo->anio}_".str_pad((string) $payroll->periodo->mes, 2, '0', STR_PAD_LEFT).'.zip';
+        $areaSlug = $areaId ? '_area_'.$areaId : '';
+        $nombre = "recibos_honorarios_{$slug}_{$payroll->periodo->anio}_".str_pad((string) $payroll->periodo->mes, 2, '0', STR_PAD_LEFT).$areaSlug.'.zip';
 
         return response()->download($tmp, $nombre)->deleteFileAfterSend(true);
     }
 
     /** Arma las filas (solo honorarios) de una planilla ya cargada. */
-    private function filasDe(Payroll $payroll)
+    private function filasDe(Payroll $payroll, ?string $areaNombre = null)
     {
         return $payroll->detalles
             ->filter(fn ($d) => ($d->modalidad ?? 'planilla') === 'honorarios')
+            ->when($areaNombre, fn ($items) => $items->filter(
+                fn ($d) => mb_strtoupper(trim((string) $d->employee?->contratoVigente->first()?->area?->nombre)) === mb_strtoupper(trim($areaNombre))
+            ))
             ->map(function ($d) {
                 $g = (array) $d->desglose;
                 $ing = $g['ingresos'] ?? [];
                 $asis = $g['asistencia'] ?? [];
+                $contrato = $d->employee?->contratoVigente->first();
 
                 return [
                     'id' => $d->id,
                     'dni' => (string) $d->employee?->numero_documento,
                     'nombre' => $d->employee?->nombre_completo,
+                    'area_id' => $contrato?->area_id,
+                    'area' => $contrato?->area?->nombre ?? 'Sin área',
                     'dias' => $asis['dias_trabajados'] ?? 0,
                     'faltas' => $asis['faltas'] ?? 0,
                     'tardanza_min' => $asis['minutos_tarde'] ?? 0,

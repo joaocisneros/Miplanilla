@@ -10,6 +10,7 @@ use App\Models\Sede;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 use Maatwebsite\Excel\Facades\Excel;
@@ -140,6 +141,8 @@ class AsistenciaController extends Controller
         $mes = (int) ($request->input('mes') ?: now()->month);
         $quincena = $request->input('quincena') !== null && $request->input('quincena') !== ''
             ? (int) $request->input('quincena') : null;
+        $modalidad = in_array($request->input('modalidad'), ['planilla', 'honorarios'], true)
+            ? $request->input('modalidad') : null;
 
         // Rango según quincena (1: 1-15, 2: 16-fin, null: mes completo).
         $base = Carbon::create($anio, $mes, 1);
@@ -163,9 +166,10 @@ class AsistenciaController extends Controller
         $filas = collect();
         if ($empresaId) {
             $empleados = Employee::where('empresa_id', $empresaId)->where('activo', true)
+                ->when($modalidad, fn ($q) => $q->where('modalidad', $modalidad))
                 ->when($soloYo, fn ($q) => $q->where('id', $user->empleado?->id))
                 ->orderBy('apellido_paterno')
-                ->get(['id', 'apellido_paterno', 'apellido_materno', 'nombres', 'numero_documento']);
+                ->get(['id', 'apellido_paterno', 'apellido_materno', 'nombres', 'numero_documento', 'modalidad']);
 
             // Cuadro resumen IMPORTADO (fuente preferida). En "Mes completo" se
             // suman las quincenas; en quincena específica, solo esa.
@@ -188,6 +192,7 @@ class AsistenciaController extends Controller
                         'employee_id' => $e->id,
                         'documento' => $e->numero_documento,
                         'empleado' => $e->nombre_completo,
+                        'modalidad' => $e->modalidad ?? 'planilla',
                         'dias_trabajados' => (float) $imp->sum('dias_trabajados'),
                         'faltas' => (int) $imp->sum('faltas'),
                         'tardanza_min' => (int) $imp->sum('tardanza_min'),
@@ -216,6 +221,7 @@ class AsistenciaController extends Controller
                     'employee_id' => $e->id,
                     'documento' => $e->numero_documento,
                     'empleado' => $e->nombre_completo,
+                    'modalidad' => $e->modalidad ?? 'planilla',
                     'dias_trabajados' => $regs->whereIn('estado', $trabajadoEstados)->count(),
                     'faltas' => $regs->where('estado', 'FALTA')->count(),
                     'tardanza_min' => (int) $regs->sum('minutos_tarde'),
@@ -241,7 +247,7 @@ class AsistenciaController extends Controller
 
         return Inertia::render('Asistencia/Resumen', [
             'filas' => $filas,
-            'filtros' => ['empresa_id' => $empresaId, 'anio' => $anio, 'mes' => $mes, 'quincena' => $quincena],
+            'filtros' => ['empresa_id' => $empresaId, 'anio' => $anio, 'mes' => $mes, 'quincena' => $quincena, 'modalidad' => $modalidad],
             'estados' => $this->estadosDisponibles(),
             'empresas' => Empresa::where('activo', true)->orderBy('razon_social')->get(['id', 'razon_social', 'nombre_comercial']),
         ]);
@@ -252,7 +258,8 @@ class AsistenciaController extends Controller
     {
         $data = $request->validate([
             'empresa_id' => ['required', 'exists:empresas,id'],
-            'employee_id' => ['required', 'exists:employees,id'],
+            'employee_id' => ['required', Rule::exists('employees', 'id')
+                ->where(fn ($q) => $q->where('empresa_id', $request->input('empresa_id')))],
             'filas' => ['required', 'array'],
             'filas.*.fecha' => ['required', 'date'],
             'filas.*.estado' => ['required', 'string', 'in:'.implode(',', array_keys($this->estadosDisponibles()))],
@@ -288,7 +295,8 @@ class AsistenciaController extends Controller
             'empresa_id' => ['required', 'exists:empresas,id'],
             'fecha' => ['required', 'date'],
             'filas' => ['required', 'array'],
-            'filas.*.employee_id' => ['required', 'integer', 'exists:employees,id'],
+            'filas.*.employee_id' => ['required', 'integer', Rule::exists('employees', 'id')
+                ->where(fn ($q) => $q->where('empresa_id', $request->input('empresa_id')))],
             'filas.*.estado' => ['required', 'string', 'in:'.implode(',', array_keys($this->estadosDisponibles()))],
             'filas.*.entrada' => ['nullable', 'date_format:H:i'],
             'filas.*.salida' => ['nullable', 'date_format:H:i'],

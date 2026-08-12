@@ -54,7 +54,7 @@ function verDetalle(d) {
                 </div>
                 <div class="flex items-center gap-2">
                     <a :href="route('planilla.detalle-excel', payroll.id)" class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">📥 Planilla detallada (Excel)</a>
-                    <a :href="route('boletas.zip', payroll.id)" class="rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700">⬇ Boletas (ZIP)</a>
+                    <a v-if="payroll.es_mensual" :href="route('boletas.zip', payroll.id)" class="rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700">⬇ Boletas mensuales (ZIP)</a>
                 </div>
             </div>
         </template>
@@ -120,7 +120,7 @@ function verDetalle(d) {
                                 <td class="px-4 py-2">
                                     <div class="flex items-center justify-end gap-2">
                                         <button @click="verDetalle(d)" class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100">👁 Ver</button>
-                                        <a :href="route('boletas.pdf', d.id)" class="inline-flex items-center gap-1 rounded-md bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200">📄 PDF</a>
+                                        <a v-if="payroll.es_mensual" :href="route('boletas.pdf', d.id)" class="inline-flex items-center gap-1 rounded-md bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200">📄 Boleta PDF</a>
                                     </div>
                                 </td>
                             </tr>

@@ -183,6 +183,8 @@ class PlanillaController extends Controller
                 'id' => $payroll->id,
                 'estado' => $payroll->estado,
                 'descripcion' => $payroll->periodo->descripcion,
+                'quincena' => $payroll->periodo->quincena,
+                'es_mensual' => $payroll->periodo->quincena === null,
                 'empresa' => $payroll->empresa->razon_social,
                 'total_ingresos' => round($dets->sum('total_ingresos'), 2),
                 'total_descuentos' => round($dets->sum('total_descuentos'), 2),
@@ -232,10 +234,12 @@ class PlanillaController extends Controller
         $detalles = $payroll->detalles->filter(fn ($d) => ($d->modalidad ?? 'planilla') !== 'honorarios');
         $n = fn ($v) => round((float) $v, 2);
         $employeeIds = $detalles->pluck('employee_id')->all();
-        $resumenes = \App\Models\AsistenciaResumen::where('empresa_id', $payroll->empresa_id)
+        $resumenQuery = \App\Models\AsistenciaResumen::where('empresa_id', $payroll->empresa_id)
             ->whereIn('employee_id', $employeeIds)
-            ->where('anio', $payroll->periodo->anio)->where('mes', $payroll->periodo->mes)
-            ->where('quincena', $payroll->periodo->quincena)->get()->keyBy('employee_id');
+            ->where('anio', $payroll->periodo->anio)->where('mes', $payroll->periodo->mes);
+        $resumenes = $payroll->periodo->quincena === null
+            ? $resumenQuery->get()->groupBy('employee_id')
+            : $resumenQuery->where('quincena', $payroll->periodo->quincena)->get()->groupBy('employee_id');
         $estados = \App\Models\Attendance::where('empresa_id', $payroll->empresa_id)
             ->whereIn('employee_id', $employeeIds)
             ->whereBetween('fecha', [$payroll->periodo->fecha_inicio, $payroll->periodo->fecha_fin])
@@ -255,11 +259,15 @@ class PlanillaController extends Controller
             $ap = $g['aportes_empleador'] ?? [];
             $sistemaBase = strtoupper((string) ($penDet['sistema'] ?? $c?->sistema_pensiones ?? ''));
             $sistema = $sistemaBase === 'AFP' ? 'AFP '.($penDet['afp'] ?? $c?->afp ?? '') : $sistemaBase;
-            $resumen = $resumenes->get($d->employee_id);
+            $resumenEmp = $resumenes->get($d->employee_id, collect());
+            // Para mensual se prefiere el resumen mensual; si no existe, se suman
+            // primera y segunda quincena, igual que en el motor de cálculo.
+            $resumenMensual = $resumenEmp->first(fn ($r) => $r->quincena === null);
+            $resumenUsado = $resumenMensual ? collect([$resumenMensual]) : $resumenEmp;
             $regs = $estados->get($d->employee_id, collect());
             $contar = fn (string $estado) => $regs->where('estado', $estado)->count();
-            $vacDias = $resumen ? (int) $resumen->vacaciones : $contar('VACACIONES');
-            $licDias = $resumen ? (int) $resumen->licencia : $contar('LICENCIA');
+            $vacDias = $resumenUsado->isNotEmpty() ? (int) $resumenUsado->sum('vacaciones') : $contar('VACACIONES');
+            $licDias = $resumenUsado->isNotEmpty() ? (int) $resumenUsado->sum('licencia') : $contar('LICENCIA');
             $asigMensual = $n($asis['asignacion_familiar'] ?? 0);
             $movMensual = $n($asis['movilidad_mensual'] ?? 0);
             $porFuera = $n($c?->otros ?? 0);

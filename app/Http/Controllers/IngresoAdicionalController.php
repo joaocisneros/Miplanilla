@@ -7,6 +7,7 @@ use App\Models\Employee;
 use App\Models\IngresoAdicional;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -77,7 +78,8 @@ class IngresoAdicionalController extends Controller
             'mes' => ['required', 'integer', 'min:1', 'max:12'],
             'quincena' => ['nullable', 'integer', 'in:1,2'],
             'filas' => ['required', 'array'],
-            'filas.*.employee_id' => ['required', 'exists:employees,id'],
+            'filas.*.employee_id' => ['required', Rule::exists('employees', 'id')
+                ->where(fn ($q) => $q->where('empresa_id', $request->input('empresa_id')))],
             'filas.*.horas' => ['nullable', 'numeric', 'min:0'],
             'filas.*.minutos' => ['nullable', 'integer', 'min:0', 'max:59'],
             'filas.*.aprobado' => ['nullable', 'boolean'],

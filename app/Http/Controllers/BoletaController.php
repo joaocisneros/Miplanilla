@@ -11,10 +11,15 @@ class BoletaController extends Controller
 {
     public function pdf(Request $request, PayrollDetail $detalle)
     {
+        $detalle->loadMissing('payroll.periodo');
+
         // Honorarios (RxH) tiene su propio "recibo" en el módulo Honorarios (sin
         // pensión/renta/aportes); la boleta de planilla no le corresponde. Se usa la
         // modalidad congelada en el detalle, no la actual del empleado.
         abort_if(($detalle->modalidad ?? 'planilla') === 'honorarios', 404);
+        // La boleta de pago es mensual. Las quincenas son adelantos/cortes internos
+        // y no deben emitir una boleta formal independiente.
+        abort_if($detalle->payroll?->periodo?->quincena !== null, 404);
 
         // Un usuario con SOLO el rol EMPLEADO únicamente puede ver su propia boleta.
         $user = $request->user();
@@ -32,6 +37,7 @@ class BoletaController extends Controller
         abort_if($request->user()->esSoloEmpleado(), 403);
 
         $payroll->load(['empresa:id,razon_social', 'periodo', 'detalles.employee']);
+        abort_if($payroll->periodo?->quincena !== null, 404);
 
         $detalles = $payroll->detalles->filter(fn ($d) => ($d->modalidad ?? 'planilla') !== 'honorarios');
 

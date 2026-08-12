@@ -61,6 +61,7 @@ const form = useForm({
     nombres: e.nombres ?? '',
     tipo_documento: e.tipo_documento ?? 'DNI',
     numero_documento: e.numero_documento ?? '',
+    ruc: e.ruc ?? '',
     fecha_nacimiento: e.fecha_nacimiento?.substring(0, 10) ?? '',
     genero: e.genero ?? '',
     estado_civil: e.estado_civil ?? '',
@@ -234,6 +235,7 @@ const inp = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm';
                     <p v-if="msgDni" class="mt-0.5 text-xs" :class="msgDni.startsWith('✔') ? 'text-green-600' : 'text-amber-600'">{{ msgDni }}</p>
                     <p v-if="form.errors.numero_documento" class="text-xs text-red-600">{{ form.errors.numero_documento }}</p>
                 </div>
+                <div v-if="esHonorarios"><label class="text-sm text-gray-700">RUC</label><input v-model="form.ruc" inputmode="numeric" maxlength="11" :class="inp" /><p class="mt-0.5 text-[11px] text-gray-400">Necesario para emitir y controlar recibos por honorarios.</p></div>
                 <div><label class="text-sm text-gray-700">Fecha nacimiento</label><input v-model="form.fecha_nacimiento" type="date" :class="inp" /></div>
                 <div><label class="text-sm text-gray-700">Género</label><select v-model="form.genero" :class="inp"><option value="">—</option><option value="M">Masculino</option><option value="F">Femenino</option></select></div>
                 <div><label class="text-sm text-gray-700">Estado civil</label><input v-model="form.estado_civil" :class="inp" /></div>
@@ -320,7 +322,7 @@ const inp = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm';
         <section v-if="!esHonorarios" class="bg-white p-6 shadow-sm sm:rounded-lg">
             <h3 class="mb-4 border-b pb-2 text-lg font-medium text-gray-900">5. Pensiones y seguros</h3>
             <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <div><label class="text-sm text-gray-700">Sistema de pensiones</label><select v-model="form.sistema_pensiones" :class="inp"><option value="">— Seleccionar —</option><option value="AFP">AFP</option><option value="ONP">ONP</option><option value="JUBILADO">JUBILADO (pensionista, sin descuento)</option></select></div>
+                <div><label class="text-sm text-gray-700">Sistema de pensiones *</label><select v-model="form.sistema_pensiones" :class="inp"><option value="">— Seleccionar —</option><option value="AFP">AFP</option><option value="ONP">ONP</option><option value="JUBILADO">JUBILADO (pensionista, sin descuento)</option></select><p v-if="form.errors.sistema_pensiones" class="text-xs text-red-600">{{ form.errors.sistema_pensiones }}</p></div>
                 <div v-if="form.sistema_pensiones === 'AFP'"><label class="text-sm text-gray-700">AFP *</label><select v-model="form.afp" :class="inp"><option value="">—</option><option>INTEGRA</option><option>PRIMA</option><option>PROFUTURO</option><option>HABITAT</option></select><p v-if="form.errors.afp" class="text-xs text-red-600">{{ form.errors.afp }}</p></div>
                 <div v-if="form.sistema_pensiones === 'AFP'"><label class="text-sm text-gray-700">Tipo comisión *</label><select v-model="form.tipo_afp" :class="inp"><option value="">—</option><option value="mixta">Mixta</option><option value="sueldo">Flujo (sueldo)</option></select><p v-if="form.errors.tipo_afp" class="text-xs text-red-600">{{ form.errors.tipo_afp }}</p></div>
                 <div v-if="form.sistema_pensiones === 'AFP'"><label class="text-sm text-gray-700">Código AFP (CUSPP)</label><input v-model="form.codigo_afp" :class="inp" /></div>
