@@ -61,10 +61,10 @@ const inp = 'w-full rounded-md border-gray-300 shadow-sm text-sm text-right';
 </script>
 
 <template>
-    <Head title="Bonos y pagos extra" />
+    <Head title="Pagos adicionales" />
     <AuthenticatedLayout>
         <template #header>
-            <h2 class="text-xl font-semibold text-gray-800">Bonos y pagos extra (S/)</h2>
+            <h2 class="text-xl font-semibold text-gray-800">Pagos adicionales (S/)</h2>
         </template>
 
         <div class="p-6 space-y-4">

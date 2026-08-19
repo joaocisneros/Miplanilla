@@ -30,3 +30,6 @@ EMPRESA-INFORMES EMPRESA/
 *.xlsx
 *.xlsm
 /shots
+
+# Artefactos de trabajo (mockups, exports temporales)
+/output

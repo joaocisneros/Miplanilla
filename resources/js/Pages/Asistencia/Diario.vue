@@ -176,7 +176,7 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                                 <p class="text-amber-900"><b>Trabajó sábado:</b> vino un sábado que no le tocaba.</p>
                                 <p class="text-amber-900"><b>Trabajó domingo:</b> vino en su descanso dominical.</p>
                                 <p class="text-amber-900"><b>Trabajó feriado:</b> vino en feriado — cobra el día más la sobretasa.</p>
-                                <p class="mt-1 text-amber-800">💡 El monto extra de estos días se registra en <b>«Bonos y pagos extra»</b>.</p>
+                                <p class="mt-1 text-amber-800">💡 El monto extra de estos días se registra en <b>«Pagos adicionales»</b>.</p>
                             </div>
                         </div>
                     </div>
