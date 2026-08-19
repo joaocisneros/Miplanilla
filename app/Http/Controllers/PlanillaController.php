@@ -178,6 +178,23 @@ class PlanillaController extends Controller
         // Se usa la modalidad congelada en el detalle, no la actual del empleado.
         $dets = $payroll->detalles->filter(fn ($d) => ($d->modalidad ?? 'planilla') !== 'honorarios')->values();
 
+        // Registros de origen de los "extras" (horas extra, sabados, domingos y bonos),
+        // para poder revisar en pantalla de donde sale cada monto. Usa la misma regla
+        // de periodo que el motor de calculo (ver PlanillaService).
+        $periodo = $payroll->periodo;
+        $adicQuery = \App\Models\IngresoAdicional::where('empresa_id', $periodo->empresa_id)
+            ->where('anio', $periodo->anio)
+            ->where('mes', $periodo->mes);
+        $adicionales = $periodo->quincena === null
+            ? (clone $adicQuery)->whereNull('quincena')->get()
+            : (clone $adicQuery)->where('quincena', $periodo->quincena)->get();
+        if ($periodo->quincena === null && $adicionales->isEmpty()) {
+            $adicionales = (clone $adicQuery)->whereIn('quincena', [1, 2])->get();
+        }
+        $adicPorEmpleado = $adicionales->groupBy('employee_id');
+        $usuariosAdic = \App\Models\User::whereIn('id', $adicionales->pluck('registrado_por')->filter()->unique())
+            ->pluck('name', 'id');
+
         return Inertia::render('Planilla/Show', [
             'payroll' => [
                 'id' => $payroll->id,
@@ -192,7 +209,7 @@ class PlanillaController extends Controller
                 'total_aportes_empleador' => round($dets->sum(fn ($d) => (float) $d->essalud + (float) $d->sctr_pension + (float) $d->sctr_salud + (float) $d->vida_ley + (float) $d->senati), 2),
                 'cantidad_empleados' => $dets->count(),
             ],
-            'detalles' => $dets->map(function ($d) {
+            'detalles' => $dets->map(function ($d) use ($adicPorEmpleado, $usuariosAdic) {
                 $c = $d->employee?->contratoVigente->first();
                 $sistema = $c?->sistema_pensiones === 'AFP'
                     ? 'AFP '.($c->afp ?? '')
@@ -211,6 +228,20 @@ class PlanillaController extends Controller
                     'total_movilidad' => $d->desglose['bloques']['total_movilidad_quincenal'] ?? null,
                     'neto' => $d->neto,
                     'desglose' => $d->desglose,
+                    'adicionales' => ($adicPorEmpleado[$d->employee_id] ?? collect())->map(fn ($a) => [
+                        'id' => $a->id,
+                        'horas' => (int) $a->horas,
+                        'minutos' => (int) $a->minutos,
+                        'monto_horas' => (float) $a->monto_horas,
+                        'aprobado' => (bool) $a->aprobado,
+                        'sabado' => (float) $a->sabado,
+                        'domingo_feriado' => (float) $a->domingo_feriado,
+                        'bono' => (float) $a->bono,
+                        'otros_afectos' => (float) $a->otros_afectos,
+                        'nota' => $a->nota,
+                        'registrado_por' => $usuariosAdic[$a->registrado_por] ?? null,
+                        'fecha' => $a->created_at?->format('d/m/Y H:i'),
+                    ])->values(),
                 ];
             }),
         ]);
