@@ -119,8 +119,13 @@ class CalculadoraPlanilla
         $adelantos = (float) ($in['adelantos'] ?? 0);
         $reintegros = (float) ($in['reintegros'] ?? 0);
 
-        // A PAGAR FINAL = Suma neto + Reintegro − Adelanto
-        $neto = round($sumaNeto + $reintegros - $adelantos, 2);
+        // A PAGAR FINAL = Suma neto + Reintegro − Adelanto.
+        // Nunca puede ser negativo: no se le puede cobrar al trabajador. Si el
+        // adelanto supera lo que le toca, se descuenta solo hasta dejarlo en 0
+        // y el resto queda pendiente (el control de que no pase esta al registrar).
+        $netoCalculado = round($sumaNeto + $reintegros - $adelantos, 2);
+        $neto = max(0, $netoCalculado);
+        $adelantoNoAplicado = $netoCalculado < 0 ? round(abs($netoCalculado), 2) : 0.0;
 
         $totalIngresos = round($baseAfecta + $totalMovilidad, 2);
         $totalDescuentos = round($pension['total'] + $renta5ta, 2);
@@ -174,6 +179,7 @@ class CalculadoraPlanilla
             'total_ingresos' => $totalIngresos,
             'total_descuentos' => $totalDescuentos,
             'reintegros' => $reintegros,
+            'adelanto_no_aplicado' => $adelantoNoAplicado,
             'neto' => $neto,
         ];
     }

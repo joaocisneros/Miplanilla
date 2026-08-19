@@ -19,14 +19,14 @@ const hoy = new Date();
 const mostrar = ref(false);
 const form = useForm({
     empresa_id: null, employee_id: null, tipo: 'adelanto',
-    anio: hoy.getFullYear(), mes: hoy.getMonth() + 1, monto: '', cuotas: 2, concepto: '',
+    anio: hoy.getFullYear(), mes: hoy.getMonth() + 1, quincena: null, monto: '', cuotas: 2, concepto: '',
 });
 
 function abrir() {
     if (!empresaId.value) { alert('Elige una empresa primero.'); return; }
     form.reset(); form.clearErrors();
     form.empresa_id = empresaId.value;
-    form.anio = hoy.getFullYear(); form.mes = hoy.getMonth() + 1; form.tipo = 'adelanto'; form.cuotas = 2;
+    form.anio = hoy.getFullYear(); form.mes = hoy.getMonth() + 1; form.tipo = 'adelanto'; form.cuotas = 2; form.quincena = null;
     mostrar.value = true;
 }
 function guardar() {
@@ -101,7 +101,10 @@ const previewCuotas = computed(() => {
                         <tr v-for="r in registros" :key="r.id" class="hover:bg-gray-50">
                             <td class="px-4 py-2 font-medium text-gray-900">{{ r.trabajador }}</td>
                             <td class="px-4 py-2"><span :class="r.tipo === 'prestamo' ? 'bg-purple-100 text-purple-800' : 'bg-amber-100 text-amber-800'" class="rounded-full px-2 py-1 text-xs font-semibold">{{ r.tipo === 'prestamo' ? 'Préstamo' : 'Adelanto' }}</span></td>
-                            <td class="px-4 py-2">{{ meses[r.mes] }} {{ r.anio }}</td>
+                            <td class="px-4 py-2">
+                                {{ meses[r.mes] }} {{ r.anio }}
+                                <span class="block text-xs text-gray-500">{{ r.quincena ? (r.quincena === 1 ? '1ra quincena' : '2da quincena') : 'Todo el mes' }}</span>
+                            </td>
                             <td class="px-4 py-2 text-center text-gray-500">{{ r.cuota ?? '—' }}</td>
                             <td class="px-4 py-2 text-right font-semibold text-red-600">{{ money(r.monto) }}</td>
                             <td class="px-4 py-2 text-gray-500">{{ r.concepto }}</td>
@@ -152,6 +155,18 @@ const previewCuotas = computed(() => {
                         <select v-model="form.mes" class="block w-full rounded-md border-gray-300 shadow-sm text-sm"><option v-for="m in 12" :key="m" :value="m">{{ meses[m] }}</option></select>
                         <input v-model="form.anio" type="number" class="block w-24 rounded-md border-gray-300 shadow-sm text-sm" />
                     </div>
+                </div>
+                <div>
+                    <label class="text-sm text-gray-700">¿En qué quincena se cobra?</label>
+                    <select v-model="form.quincena" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm">
+                        <option :value="null">Todo el mes (se cobra en la 2da quincena)</option>
+                        <option :value="1">Solo 1ra quincena</option>
+                        <option :value="2">Solo 2da quincena</option>
+                    </select>
+                    <p class="mt-1 text-xs text-gray-500">
+                        El descuento se aplica una sola vez al mes, en la quincena que elijas.
+                    </p>
+                    <p v-if="form.errors.quincena" class="text-xs text-red-600">{{ form.errors.quincena }}</p>
                 </div>
                 <div class="md:col-span-2"><label class="text-sm text-gray-700">Concepto / motivo</label><input v-model="form.concepto" :class="inp" placeholder="Ej: adelanto de sueldo, préstamo personal" /></div>
 

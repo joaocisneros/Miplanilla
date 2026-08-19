@@ -10,7 +10,7 @@ class Adelanto extends Model
     protected $table = 'adelantos';
 
     protected $fillable = [
-        'empresa_id', 'employee_id', 'tipo', 'anio', 'mes', 'monto',
+        'empresa_id', 'employee_id', 'tipo', 'anio', 'mes', 'quincena', 'monto',
         'concepto', 'grupo', 'cuota_num', 'cuotas_total', 'registrado_por',
     ];
 

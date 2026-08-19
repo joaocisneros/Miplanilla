@@ -114,13 +114,24 @@ class PlanillaService
                 }
                 } // fin else (planilla)
 
-                // Adelantos / cuotas de préstamo a descontar en este periodo (mes).
-                // El adelanto es mensual: se descuenta una sola vez. En esquema
-                // quincenal corresponde a la 2da quincena; en mensual, al cierre del mes.
-                $adelantos = $periodo->quincena === 1 ? 0.0 : (float) Adelanto::where('empresa_id', $periodo->empresa_id)
+                // Adelantos / cuotas de préstamo a descontar en este periodo.
+                // Cada registro puede fijar en qué quincena se cobra. Si no la fija
+                // (quincena NULL) se considera mensual y se descuenta en la 2da
+                // quincena, o en el cierre del mes cuando la planilla es mensual.
+                // Así el adelanto nunca se cobra dos veces en el mismo mes.
+                $adelantos = (float) Adelanto::where('empresa_id', $periodo->empresa_id)
                     ->where('employee_id', $emp->id)
                     ->where('anio', $periodo->anio)
                     ->where('mes', $periodo->mes)
+                    ->where(function ($q) use ($periodo) {
+                        if ($periodo->quincena === null) {
+                            return; // planilla mensual: entra todo el mes
+                        }
+                        $q->where('quincena', $periodo->quincena);
+                        if ($periodo->quincena === 2) {
+                            $q->orWhereNull('quincena');
+                        }
+                    })
                     ->sum('monto');
 
                 // Ingresos adicionales aprobados por el supervisor (horas extra + bonos).
