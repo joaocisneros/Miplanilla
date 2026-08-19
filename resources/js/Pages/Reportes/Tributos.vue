@@ -33,10 +33,10 @@ const periodoLabel = computed(() => `${meses[props.filtros.mes]} ${props.filtros
 
         <div class="p-6 space-y-6">
             <div class="rounded-lg bg-amber-50 p-4 text-sm text-amber-900">
-                Resumen de <b>cuánto declarar y pagar</b> por empresa y mes. El sistema calcula los montos exactos;
-                la <b>declaración</b> se presenta en las plataformas oficiales: <b>PLAME</b> (SUNAT, con tu Clave SOL),
-                <b>AFPnet</b> (AFP) y el pago de pólizas (SCTR / Vida Ley). Usa <b>“Descargar PLAME”</b> para llevar el
-                detalle por trabajador a SUNAT.
+                Resumen mensual de <b>tributos, aportes y seguros</b> por empresa. Utilízalo como control previo y
+                valida los importes en las plataformas oficiales antes de declarar: <b>PLAME</b> (SUNAT),
+                <b>AFPnet</b> y las pólizas de <b>SCTR / Vida Ley</b>. La descarga es un documento de apoyo y no
+                reemplaza la presentación oficial con Clave SOL.
             </div>
 
             <div class="flex flex-wrap items-end gap-3 bg-white p-4 shadow-sm sm:rounded-lg">
@@ -56,7 +56,7 @@ const periodoLabel = computed(() => `${meses[props.filtros.mes]} ${props.filtros
                         <h3 class="font-semibold text-gray-900">{{ e.empresa }}</h3>
                         <p class="text-xs text-gray-500">RUC {{ e.ruc || '—' }} · {{ e.empleados }} trabajadores ({{ e.empleados_onp }} ONP / {{ e.empleados_afp }} AFP) · Base imponible {{ money(e.base_imponible) }}</p>
                     </div>
-                    <button @click="descargarPlame(e.empresa_id)" class="rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700">⬇ Descargar PLAME (Excel)</button>
+                    <button @click="descargarPlame(e.empresa_id)" class="rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700">⬇ Descargar resumen para PLAME</button>
                 </div>
 
                 <div class="grid gap-4 p-5 lg:grid-cols-3">

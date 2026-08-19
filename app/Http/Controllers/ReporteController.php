@@ -336,9 +336,8 @@ class ReporteController extends Controller
     }
 
     /**
-     * Exporta el detalle por trabajador en formato CSV compatible con la
-     * Planilla Electrónica (PLAME): una fila por trabajador con su base
-     * imponible, tributos y aportes. Pensado para cargar/transcribir en SUNAT.
+     * Exporta un resumen mensual de apoyo para revisar la declaración PLAME.
+     * No reemplaza los archivos de importación ni la validación oficial SUNAT.
      */
     public function plame(Request $request): StreamedResponse
     {
@@ -352,7 +351,10 @@ class ReporteController extends Controller
             ->whereHas('periodo', fn ($q) => $q->where('anio', $anio)->where('mes', $mes))
             ->with(['detalles.employee:id,nombres,apellido_paterno,apellido_materno,numero_documento'])
             ->get()
-            ->flatMap->detalles;
+            ->flatMap->detalles
+            // Los recibos por honorarios se declaran por otra vía y no deben
+            // mezclarse con el resumen mensual de trabajadores en planilla.
+            ->filter(fn ($detalle) => ($detalle->modalidad ?? 'planilla') !== 'honorarios');
 
         $headers = [
             'DNI', 'Trabajador', 'Sistema pensión', 'AFP', 'Base imponible',
@@ -361,7 +363,7 @@ class ReporteController extends Controller
         ];
 
         $slug = preg_replace('/[^a-z0-9]+/i', '_', strtolower($empresa->razon_social));
-        $nombre = "plame_{$slug}_{$anio}_".str_pad((string) $mes, 2, '0', STR_PAD_LEFT).'.csv';
+        $nombre = "resumen_para_plame_{$slug}_{$anio}_".str_pad((string) $mes, 2, '0', STR_PAD_LEFT).'.xlsx';
 
         // Una fila por trabajador por mes (PLAME es mensual): si hay varias
         // quincenas en el mes, se suman los montos del mismo trabajador.
@@ -394,22 +396,62 @@ class ReporteController extends Controller
             ];
         })->sortBy('nombre')->values();
 
-        return response()->streamDownload(function () use ($porTrabajador, $headers) {
-            $out = fopen('php://output', 'w');
-            fwrite($out, "\xEF\xBB\xBF"); // BOM para que Excel respete acentos
-            fputcsv($out, $headers, ';');
+        return response()->streamDownload(function () use ($porTrabajador, $headers, $empresa, $anio, $mes) {
+            $libro = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+            $hoja = $libro->getActiveSheet();
+            $hoja->setTitle('Resumen PLAME');
+            $meses = [1 => 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
-            $n2 = fn ($v) => number_format((float) $v, 2, '.', '');
+            $hoja->mergeCells('A1:P1')->setCellValue('A1', 'RESUMEN MENSUAL PARA PLAME');
+            $hoja->mergeCells('A2:P2')->setCellValue('A2', $empresa->razon_social.'  |  RUC '.$empresa->ruc);
+            $hoja->mergeCells('A3:P3')->setCellValue('A3', 'Período: '.($meses[$mes] ?? $mes).' '.$anio.'  |  Trabajadores: '.$porTrabajador->count());
+            $hoja->mergeCells('A4:P4')->setCellValue('A4', 'Documento de control previo. Verifique la información en el aplicativo oficial PLAME antes de presentar la declaración.');
+            $hoja->fromArray($headers, null, 'A6');
+
+            $fila = 7;
             foreach ($porTrabajador as $t) {
-                fputcsv($out, [
-                    $t['dni'], $t['nombre'], $t['sistema'], $t['afp'],
-                    $n2($t['base']), $n2($t['essalud']), $n2($t['onp']),
-                    $n2($t['afp_aporte']), $n2($t['afp_comision']), $n2($t['afp_prima']),
-                    $n2($t['renta_5ta']), $n2($t['sctr_pension']), $n2($t['sctr_salud']),
-                    $n2($t['vida_ley']), $n2($t['senati']), $n2($t['neto']),
-                ], ';');
+                $hoja->setCellValueExplicit('A'.$fila, (string) $t['dni'], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+                $hoja->fromArray([
+                    $t['nombre'], $t['sistema'], $t['afp'], (float) $t['base'], (float) $t['essalud'],
+                    (float) $t['onp'], (float) $t['afp_aporte'], (float) $t['afp_comision'], (float) $t['afp_prima'],
+                    (float) $t['renta_5ta'], (float) $t['sctr_pension'], (float) $t['sctr_salud'],
+                    (float) $t['vida_ley'], (float) $t['senati'], (float) $t['neto'],
+                ], null, 'B'.$fila);
+                $fila++;
             }
-            fclose($out);
-        }, $nombre, ['Content-Type' => 'text/csv; charset=UTF-8']);
+
+            $filaTotal = $fila;
+            $hoja->mergeCells('A'.$filaTotal.':D'.$filaTotal)->setCellValue('A'.$filaTotal, 'TOTALES');
+            for ($col = 5; $col <= 16; $col++) {
+                $letra = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col);
+                $hoja->setCellValue($letra.$filaTotal, $filaTotal > 7 ? '=SUM('.$letra.'7:'.$letra.($filaTotal - 1).')' : 0);
+            }
+
+            $borde = ['borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['rgb' => 'D7DEE8']]]];
+            $hoja->getStyle('A1:P1')->applyFromArray(['font' => ['bold' => true, 'size' => 18, 'color' => ['rgb' => 'FFFFFF']], 'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => '17365D']], 'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER]]);
+            $hoja->getStyle('A2:P3')->applyFromArray(['font' => ['bold' => true, 'color' => ['rgb' => '17365D']], 'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER]]);
+            $hoja->getStyle('A4:P4')->applyFromArray(['font' => ['italic' => true, 'color' => ['rgb' => '7F6000']], 'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => 'FFF2CC']], 'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER]]);
+            $hoja->getStyle('A6:P6')->applyFromArray(['font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']], 'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => '17365D']], 'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER, 'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER, 'wrapText' => true]]);
+            $hoja->getStyle('A6:P'.$filaTotal)->applyFromArray($borde);
+            $hoja->getStyle('A'.$filaTotal.':P'.$filaTotal)->applyFromArray(['font' => ['bold' => true, 'color' => ['rgb' => '17365D']], 'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => 'E2F0D9']]]);
+            // El símbolo se encierra como literal: Excel puede intentar reparar
+            // el libro si interpreta la barra de "S/" como parte del formato.
+            $hoja->getStyle('E7:P'.$filaTotal)->getNumberFormat()->setFormatCode('"S/ "#,##0.00');
+            $hoja->getStyle('A7:D'.($filaTotal - 1))->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setRGB('F8FAFC');
+
+            foreach (['A' => 15, 'B' => 38, 'C' => 18, 'D' => 16] as $col => $ancho) $hoja->getColumnDimension($col)->setWidth($ancho);
+            foreach (range('E', 'P') as $col) $hoja->getColumnDimension($col)->setWidth(17);
+            $hoja->getRowDimension(1)->setRowHeight(30);
+            $hoja->getRowDimension(4)->setRowHeight(28);
+            $hoja->getRowDimension(6)->setRowHeight(36);
+            $hoja->freezePane('E7');
+            $hoja->setAutoFilter('A6:P'.($filaTotal - 1));
+            $hoja->setShowGridlines(false);
+            $hoja->getPageSetup()->setOrientation(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::ORIENTATION_LANDSCAPE)->setFitToWidth(1)->setFitToHeight(0);
+            $hoja->getPageMargins()->setTop(0.4)->setRight(0.3)->setLeft(0.3)->setBottom(0.4);
+
+            (new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($libro))->save('php://output');
+            $libro->disconnectWorksheets();
+        }, $nombre, ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
     }
 }
