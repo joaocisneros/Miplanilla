@@ -33,6 +33,8 @@ class RolePermissionSeeder extends Seeder
             'reportes.ver',
             // Contratistas (pago por avance de obra)
             'contratistas.ver', 'contratistas.gestionar', 'contratistas.avance',
+            // Vendedores externos y sus pagos por empresa
+            'ventas-externas.ver', 'ventas-externas.gestionar',
         ];
 
         foreach ($permisos as $p) {
@@ -51,12 +53,14 @@ class RolePermissionSeeder extends Seeder
                 'planilla.ver', 'planilla.generar',
                 'boletas.ver', 'reportes.ver',
                 'contratistas.ver', 'contratistas.gestionar', 'contratistas.avance',
+                'ventas-externas.ver', 'ventas-externas.gestionar',
             ],
             'SUPERVISOR' => [
                 'asistencia.ver', 'asistencia.justificar',
                 'empleados.ver', 'reportes.ver',
                 // El supervisor registra el avance de obra (no gestiona pagos).
                 'contratistas.ver', 'contratistas.avance',
+                'ventas-externas.ver',
             ],
             // Auditor externo (SUNAT/SUNAFIL, revisor puntual): solo lectura general.
             'AUDITOR' => [
@@ -70,6 +74,7 @@ class RolePermissionSeeder extends Seeder
             // suele ser quien actualiza esas tasas legales cada año.
             'CONTADOR' => [
                 'planilla.ver', 'boletas.ver', 'reportes.ver',
+                'ventas-externas.ver',
                 'config.ver', 'config.editar',
             ],
             'EMPLEADO' => [

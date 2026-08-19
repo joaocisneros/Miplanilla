@@ -102,6 +102,22 @@ Route::middleware('auth')->group(function () {
     Route::post('honorarios/{payroll}/cerrar', [\App\Http\Controllers\HonorarioController::class, 'cerrar'])->middleware('role:ADMIN')->name('honorarios.cerrar');
     Route::post('honorarios/{payroll}/reabrir', [\App\Http\Controllers\HonorarioController::class, 'reabrir'])->middleware('role:ADMIN')->name('honorarios.reabrir');
 
+    // Ventas externas: personal independiente, sin asistencia ni beneficios de planilla.
+    Route::get('ventas-externas', [\App\Http\Controllers\VentaExternaController::class, 'index'])->middleware('permission:ventas-externas.ver')->name('ventas-externas.index');
+    Route::get('ventas-externas/consulta-dni/{dni}', [\App\Http\Controllers\VentaExternaController::class, 'consultaDni'])->middleware('permission:ventas-externas.gestionar')->name('ventas-externas.consulta-dni');
+    Route::get('ventas-externas/vendedores', [\App\Http\Controllers\VentaExternaController::class, 'vendedores'])->middleware('permission:ventas-externas.ver')->name('ventas-externas.vendedores');
+    Route::get('ventas-externas/periodos/{periodo}', [\App\Http\Controllers\VentaExternaController::class, 'show'])->middleware('permission:ventas-externas.ver')->name('ventas-externas.show');
+    Route::get('ventas-externas/periodos/{periodo}/exportar', [\App\Http\Controllers\VentaExternaController::class, 'export'])->middleware('permission:ventas-externas.ver')->name('ventas-externas.export');
+    Route::middleware('permission:ventas-externas.gestionar')->group(function () {
+        Route::post('ventas-externas/vendedores', [\App\Http\Controllers\VentaExternaController::class, 'storeVendedor'])->name('ventas-externas.vendedores.store');
+        Route::put('ventas-externas/vendedores/{vendedor}', [\App\Http\Controllers\VentaExternaController::class, 'updateVendedor'])->name('ventas-externas.vendedores.update');
+        Route::post('ventas-externas/vendedores/{vendedor}/tarifas', [\App\Http\Controllers\VentaExternaController::class, 'storeTarifa'])->name('ventas-externas.tarifas.store');
+        Route::post('ventas-externas/generar', [\App\Http\Controllers\VentaExternaController::class, 'generar'])->name('ventas-externas.generar');
+        Route::put('ventas-externas/pagos/{pago}', [\App\Http\Controllers\VentaExternaController::class, 'updatePago'])->name('ventas-externas.pagos.update');
+    });
+    Route::post('ventas-externas/periodos/{periodo}/cerrar', [\App\Http\Controllers\VentaExternaController::class, 'cerrar'])->middleware('role:ADMIN')->name('ventas-externas.cerrar');
+    Route::post('ventas-externas/periodos/{periodo}/reabrir', [\App\Http\Controllers\VentaExternaController::class, 'reabrir'])->middleware('role:ADMIN')->name('ventas-externas.reabrir');
+
     // Contratistas (pago por avance de obra; separado de planilla/RxH)
     Route::get('contratistas', [\App\Http\Controllers\ContratistaController::class, 'index'])->middleware('permission:contratistas.ver')->name('contratistas.index');
     Route::get('contratistas/corte/excel', [\App\Http\Controllers\ContratistaController::class, 'exportCorte'])->middleware('permission:contratistas.ver')->name('contratistas.corte.excel');

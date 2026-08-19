@@ -73,7 +73,8 @@ const menu = computed(() => [
         items: [
             { label: 'Planilla', icon: '💰', route: 'planilla.index', active: 'planilla.*', show: can('planilla.ver') },
             { label: 'Honorarios (RxH)', icon: '🧾', route: 'honorarios.index', active: 'honorarios.*', show: can('planilla.ver') },
-            { label: 'Bonos y pagos extra', icon: '💵', route: 'adicionales.index', active: 'adicionales.*', show: can('planilla.ver') },
+            { label: 'Ventas externos', icon: '📈', route: 'ventas-externas.index', active: 'ventas-externas.*', show: can('ventas-externas.ver') },
+            { label: 'Pagos adicionales', icon: '💵', route: 'adicionales.index', active: 'adicionales.*', show: can('planilla.ver') },
             { label: 'Adelantos / Préstamos', icon: '💸', route: 'adelantos.index', active: 'adelantos.*', show: can('planilla.ver') },
             { label: 'Contratistas (avance)', icon: '🏗️', route: 'contratistas.index', active: 'contratistas.*', show: can('contratistas.ver') },
         ],
