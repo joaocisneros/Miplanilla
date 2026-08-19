@@ -125,7 +125,7 @@ class EmployeeController extends Controller
                 'empleados' => $empleados,
                 'filtros' => ['empresa_id' => $empresaId, 'sede_id' => $sedeId],
                 'modalidadFija' => $modalidadFija,
-                'rutaIndex' => $modalidadFija ? 'empleados.honorarios' : 'empleados.index',
+                'rutaIndex' => $modalidadFija === 'honorarios' ? 'empleados.honorarios' : 'empleados.index',
             ],
             $this->datosFormulario()
         ));
