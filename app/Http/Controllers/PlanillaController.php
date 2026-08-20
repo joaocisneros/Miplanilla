@@ -299,7 +299,10 @@ class PlanillaController extends Controller
             $asis = $g['asistencia'] ?? [];
             $ap = $g['aportes_empleador'] ?? [];
             $sistemaBase = strtoupper((string) ($penDet['sistema'] ?? $c?->sistema_pensiones ?? ''));
-            $sistema = $sistemaBase === 'AFP' ? 'AFP '.($penDet['afp'] ?? $c?->afp ?? '') : $sistemaBase;
+            $afpNombre = strtoupper((string) ($penDet['afp'] ?? $c?->afp ?? ''));
+            $tipoAfp = strtolower((string) ($penDet['tipo'] ?? $c?->tipo_afp ?? ''));
+            $tipoTexto = $tipoAfp === 'mixta' ? 'MIXTA' : ($tipoAfp !== '' ? 'FLUJO' : '');
+            $sistema = $sistemaBase === 'AFP' ? trim($afpNombre.' '.$tipoTexto) : $sistemaBase;
             $resumenEmp = $resumenes->get($d->employee_id, collect());
             // Para mensual se prefiere el resumen mensual; si no existe, se suman
             // primera y segunda quincena, igual que en el motor de cálculo.
@@ -366,8 +369,8 @@ class PlanillaController extends Controller
                 /* 34 INSENTIVOS OTROS    */ $b($ing['incentivos'] ?? 0),
                 /* 35 TOTAL REM X MOVIL   */ $b($movQuincenal),
                 /* 36 SISTEMA PENSIONES   */ trim($sistema) ?: null,
-                /* 37 COM                 */ ((float) ($penDet['tasa_comision'] ?? 0)) == 0.0 ? null : round((float) $penDet['tasa_comision'], 4),
-                /* 38 (sin titulo) PRIMA  */ ((float) ($penDet['tasa_prima'] ?? 0)) == 0.0 ? null : round((float) $penDet['tasa_prima'], 4),
+                /* 37 COM                 */ $sistemaBase === 'AFP' ? round((float) ($penDet['tasa_comision'] ?? 0), 4) : null,
+                /* 38 (sin titulo) PRIMA  */ $sistemaBase === 'AFP' ? round((float) ($penDet['tasa_prima'] ?? 0), 4) : null,
                 /* 39 ONP 13%             */ $sistemaBase === 'ONP' ? $b($afpAporte) : null,
                 /* 40 AFP 10%             */ $sistemaBase === 'AFP' ? $b($afpAporte) : null,
                 /* 41 AFP COMISION        */ $b($afpComision),

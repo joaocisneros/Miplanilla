@@ -101,7 +101,7 @@ class PlanillaClienteExport extends DefaultValueBinder implements FromArray, Wit
 
             $sheet->freezePane('E3');
             $sheet->setAutoFilter("A2:{$lastCol}{$lastRow}");
-            $sheet->getRowDimension(1)->setRowHeight(38);
+            $sheet->getRowDimension(1)->setRowHeight(46);
             $sheet->getRowDimension(2)->setRowHeight(32);
             $sheet->getStyle("A1:{$lastCol}2")->applyFromArray([
                 'font'=>['bold'=>true,'color'=>['rgb'=>'FFFFFF'],'size'=>9],
@@ -144,6 +144,11 @@ class PlanillaClienteExport extends DefaultValueBinder implements FromArray, Wit
             $sheet->getColumnDimension('C')->setWidth(12);  // FECHA DE NACIM.
             $sheet->getColumnDimension('D')->setWidth(12);  // DNI
             $sheet->getColumnDimension('AJ')->setWidth(18); // SISTEMA DE PENSIONES
+            // Titulos largos que el cliente NO fusiona: con 10 de ancho se cortaban
+            // ("DESCANSO MEDIC...", "DOMINGO Y FERI..."). Se les da aire.
+            foreach (['Q' => 14, 'AE' => 14, 'AG' => 13, 'AW' => 13, 'AY' => 13] as $letra => $ancho) {
+                $sheet->getColumnDimension($letra)->setWidth($ancho);
+            }
         }];
     }
 }
