@@ -33,7 +33,7 @@ class PlanillaClienteExport extends DefaultValueBinder implements FromArray, Sho
             'ITEM', 'APELLIDO Y NOMBRES', "FECHA DE\nNACIM.", 'DNI',
             "SUELDO\nBASICO", 'ASIG FAM', 'MOV', 'TOTAL MENSUAL', "DIAS\nTRBAJADOS",
             'DIAS FALTOS', '', 'SUBSIDIO', '', 'ADELANTOS', '', '',
-            'DESCANSO', '', 'VACACIONES', '',
+            'DESCANSO MEDICO', '', 'VACACIONES', '',
             'GRATIFICACIÓN JUL '.$this->anioCorto, 'GRATIFICACIÓN DIC '.$this->anioCorto, 'LICENCIA',
             'TARDANZAS', '', "TOTAL\nREM\nNETA BASICA",
             'HE', '', 'SABADOS', '', 'DOMINGO Y FERIADO', '', 'INSENTIVOS', '',
@@ -57,9 +57,9 @@ class PlanillaClienteExport extends DefaultValueBinder implements FromArray, Sho
             30 => 'DIAS', 31 => 'MONTO',
             32 => 'POR PROD.', 33 => 'OTROS',
             36 => 'COM',
-            38 => '13%', 39 => '10%', 40 => 'COMISI', 41 => 'PRIMA',
-            43 => "y AFP y\nONP",
-            46 => '9%', 47 => '2.14%', 49 => 'DL 688',
+            38 => 0.13, 39 => 0.1, 40 => 'COMISION', 41 => 'PRIMA',
+            43 => "AFP Y\nONP",
+            46 => 0.09, 47 => 0.0214, 49 => 'DL 688',
         ] as $index => $label) {
             $inferior[$index] = $label;
         }
@@ -84,7 +84,7 @@ class PlanillaClienteExport extends DefaultValueBinder implements FromArray, Sho
             $lastRow = count($this->rows) + 2;
             $lastCol = 'BA';  // 53 columnas: A..BA
 
-            foreach (['A:I','U:W','Z:Z','AI:AI','AM:AM','AQ:AR','AS:AU','AV:AY','AZ:BA'] as $range) {
+            foreach (['A:I','U:W','Z:Z','AI:AI','AQ:AQ','AS:AT','AW:AW','AY:BA'] as $range) {
                 [$from,$to] = explode(':', $range);
                 for ($column=Coordinate::columnIndexFromString($from); $column<=Coordinate::columnIndexFromString($to); $column++) {
                     $letter = Coordinate::stringFromColumnIndex($column);
@@ -94,6 +94,11 @@ class PlanillaClienteExport extends DefaultValueBinder implements FromArray, Sho
             foreach (['J1:K1','L1:M1','N1:P1','Q1:R1','S1:T1','X1:Y1','AA1:AB1','AC1:AD1','AE1:AF1','AG1:AH1','AJ1:AL1','AN1:AP1'] as $range) {
                 $sheet->mergeCells($range);
             }
+
+            foreach (['AM2', 'AN2', 'AU2'] as $celda) {
+                $sheet->getStyle($celda)->getNumberFormat()->setFormatCode('0%');
+            }
+            $sheet->getStyle('AV2')->getNumberFormat()->setFormatCode('0.00%');
 
             $sheet->freezePane('E3');
             $sheet->setAutoFilter("A2:{$lastCol}{$lastRow}");
