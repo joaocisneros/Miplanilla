@@ -34,14 +34,30 @@ return new class extends Migration
         $this->cambiarEnum(array_values(array_diff(self::ESTADOS, ['REMOTO'])));
     }
 
+    /**
+     * La columna se creo con $table->enum(). Cada motor lo implementa distinto:
+     * MySQL usa un ENUM y PostgreSQL un varchar con una restriccion CHECK. Hay que
+     * tocar los dos, si no en produccion (PostgreSQL) el estado nuevo se rechaza.
+     */
     private function cambiarEnum(array $estados): void
     {
-        // SQLite (usado en los tests) no tiene ENUM: la columna ya es de texto libre.
-        if (DB::getDriverName() !== 'mysql') {
+        $lista = implode(',', array_map(fn ($e) => "'".$e."'", $estados));
+        $motor = DB::getDriverName();
+
+        if ($motor === 'mysql') {
+            DB::statement("ALTER TABLE attendance MODIFY estado ENUM({$lista}) NOT NULL DEFAULT 'NORMAL'");
+
             return;
         }
 
-        $lista = implode(',', array_map(fn ($e) => "'".$e."'", $estados));
-        DB::statement("ALTER TABLE attendance MODIFY estado ENUM({$lista}) NOT NULL DEFAULT 'NORMAL'");
+        if ($motor === 'pgsql') {
+            DB::statement('ALTER TABLE attendance DROP CONSTRAINT IF EXISTS attendance_estado_check');
+            DB::statement("ALTER TABLE attendance ADD CONSTRAINT attendance_estado_check CHECK (estado IN ({$lista}))");
+
+            return;
+        }
+
+        // SQLite (tests): no admite alterar una restriccion CHECK sin rehacer la
+        // tabla. Se deja como esta; los tests corren sobre una base recien migrada.
     }
 };

@@ -43,12 +43,23 @@ class ImportadorAsistenciaCliente
         $sinEmpleado = [];
         $periodos = [];
         $importados = 0;
+        $conservados = 0;
 
-        DB::transaction(function () use ($filas, $empresaId, $empleados, &$sinEmpleado, &$periodos, &$importados) {
+        DB::transaction(function () use ($filas, $empresaId, $empleados, &$sinEmpleado, &$periodos, &$importados, &$conservados) {
             foreach ($filas as $f) {
                 $employeeId = $empleados[$f['dni']] ?? null;
                 if (! $employeeId) {
                     $sinEmpleado[$f['dni']] = $f['nombre'];
+
+                    continue;
+                }
+
+                // Lo corregido a mano gana sobre el Excel: si no, reimportar el
+                // mismo archivo borraria en silencio el trabajo de quien reviso.
+                $existente = Attendance::where('employee_id', $employeeId)
+                    ->whereDate('fecha', $f['fecha'])->first();
+                if ($existente && $existente->origen === 'manual') {
+                    $conservados++;
 
                     continue;
                 }
@@ -82,6 +93,7 @@ class ImportadorAsistenciaCliente
 
         return [
             'importados' => $importados,
+            'conservados' => $conservados,
             'dias' => count(array_unique(array_column($filas, 'fecha'))),
             'trabajadores' => count(array_unique(array_column($filas, 'dni'))),
             'resumenes' => $resumenes,
@@ -135,7 +147,7 @@ class ImportadorAsistenciaCliente
 
     private function vacio(array $avisos): array
     {
-        return ['importados' => 0, 'dias' => 0, 'trabajadores' => 0, 'resumenes' => 0,
+        return ['importados' => 0, 'conservados' => 0, 'dias' => 0, 'trabajadores' => 0, 'resumenes' => 0,
             'sin_empleado' => [], 'avisos' => $avisos];
     }
 }
