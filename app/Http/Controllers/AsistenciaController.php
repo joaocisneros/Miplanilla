@@ -297,6 +297,9 @@ class AsistenciaController extends Controller
             }
         });
 
+        $this->rehacerResumenes($data['empresa_id'], collect($data['filas'])
+            ->map(fn ($f) => [$data['employee_id'], $f['fecha']])->all());
+
         return back()->with('success', 'Asistencia del trabajador actualizada.');
     }
 
@@ -370,10 +373,40 @@ class AsistenciaController extends Controller
             }
         });
 
+        $this->rehacerResumenes($data['empresa_id'], collect($data['filas'])
+            ->map(fn ($f) => [$f['employee_id'], $data['fecha']])->all());
+
         return back()->with('success', 'Asistencia del '.$data['fecha'].' guardada.');
     }
 
     /** Estados seleccionables en el registro manual (etiqueta en español). */
+    /**
+     * Rehace el cuadro resumen de las quincenas tocadas.
+     *
+     * La planilla lee el resumen, no el registro diario. Sin esto, corregir una
+     * falta o marcar un remoto en pantalla quedaba guardado pero no llegaba al
+     * calculo. Solo se rehace si esa quincena ya tiene registros diarios: si el
+     * periodo se cargo solo con totales, recalcular pondria los dias al maximo y
+     * borraria las faltas.
+     *
+     * @param  array<int,array{0:int,1:string}>  $tocados  pares [employee_id, fecha]
+     */
+    private function rehacerResumenes(int $empresaId, array $tocados): void
+    {
+        $importador = app(\App\Domain\Asistencia\ImportadorAsistenciaCliente::class);
+
+        $periodos = [];
+        foreach ($tocados as [$employeeId, $fecha]) {
+            $f = Carbon::parse($fecha);
+            $periodos[$employeeId.'|'.$f->year.'|'.$f->month.'|'.($f->day <= 15 ? 1 : 2)] = true;
+        }
+
+        foreach (array_keys($periodos) as $clave) {
+            [$employeeId, $anio, $mes, $quincena] = explode('|', $clave);
+            $importador->recalcularResumen($empresaId, (int) $employeeId, (int) $anio, (int) $mes, (int) $quincena);
+        }
+    }
+
     private function estadosDisponibles(): array
     {
         // La aclaración entre paréntesis es solo visual: la importación ignora
