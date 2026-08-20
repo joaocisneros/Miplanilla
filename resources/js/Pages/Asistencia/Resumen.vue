@@ -17,7 +17,7 @@ const fEmpresa = ref(props.filtros.empresa_id ?? '');
 const fAnio = ref(props.filtros.anio ?? new Date().getFullYear());
 const fMes = ref(props.filtros.mes ?? new Date().getMonth() + 1);
 const fQuincena = ref(props.filtros.quincena ?? '');
-const fModalidad = ref(props.filtros.modalidad ?? '');
+const fModalidad = ref(props.filtros.modalidad ?? 'planilla');
 const anioActual = new Date().getFullYear();
 const anios = Array.from({ length: 6 }, (_, i) => anioActual + 1 - i);
 
@@ -36,6 +36,8 @@ const filasFiltradas = computed(() => {
         return coincideTexto && coincideTipo;
     });
 });
+
+function cambiarModalidad(m) { fModalidad.value = m; filtrar(); }
 
 function filtrar() {
     router.get(route('asistencia.resumen'), {
@@ -106,9 +108,24 @@ const inp = 'block w-full rounded-md border-gray-300 text-sm';
                 Revisa el mes completo de cada trabajador <b>antes de generar la planilla</b>. Haz <b>clic en un trabajador</b> para ver sus días y justificar/corregir tardanzas o faltas.
             </div>
 
+            <!-- Modalidad: fila propia. Dentro de la rejilla de filtros los tres
+                 botones no entran en una celda y quedan amontonados. -->
+            <div class="flex flex-wrap gap-2">
+                <button type="button" @click="cambiarModalidad('planilla')"
+                    class="rounded-md px-4 py-2 text-sm font-semibold transition"
+                    :class="fModalidad === 'planilla' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-gray-600 ring-1 ring-gray-300 hover:bg-gray-50'">
+                    👷 Planilla
+                </button>
+                <button type="button" @click="cambiarModalidad('honorarios')"
+                    class="rounded-md px-4 py-2 text-sm font-semibold transition"
+                    :class="fModalidad === 'honorarios' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-gray-600 ring-1 ring-gray-300 hover:bg-gray-50'">
+                    🧾 Honorarios (RxH)
+                </button>
+            </div>
+
             <!-- Filtros -->
             <div class="rounded-lg bg-white p-4 shadow-sm">
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
                     <div class="lg:col-span-2">
                         <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Empresa</label>
                         <select v-model="fEmpresa" @change="filtrar" :class="ctrl">
@@ -116,20 +133,7 @@ const inp = 'block w-full rounded-md border-gray-300 text-sm';
                             <option v-for="e in empresas" :key="e.id" :value="e.id">{{ e.nombre_comercial || e.razon_social }}</option>
                         </select>
                     </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Modalidad</label>
-                        <select v-model="fModalidad" @change="filtrar" :class="ctrl">
-                            <option value="">Todos</option>
-                            <option value="planilla">Planilla</option>
-                            <option value="honorarios">Honorarios (RxH)</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Año</label>
-                        <select v-model.number="fAnio" @change="filtrar" :class="ctrl">
-                            <option v-for="a in anios" :key="a" :value="a">{{ a }}</option>
-                        </select>
-                    </div>
+
                     <div>
                         <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Mes</label>
                         <select v-model.number="fMes" @change="filtrar" :class="ctrl">

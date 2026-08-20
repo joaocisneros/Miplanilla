@@ -141,8 +141,10 @@ class AsistenciaController extends Controller
         $mes = (int) ($request->input('mes') ?: now()->month);
         $quincena = $request->input('quincena') !== null && $request->input('quincena') !== ''
             ? (int) $request->input('quincena') : null;
+        // Por defecto Planilla, igual que en el registro diario: el cliente no
+        // quiere ver las dos modalidades mezcladas.
         $modalidad = in_array($request->input('modalidad'), ['planilla', 'honorarios'], true)
-            ? $request->input('modalidad') : null;
+            ? $request->input('modalidad') : 'planilla';
 
         // Rango según quincena (1: 1-15, 2: 16-fin, null: mes completo).
         $base = Carbon::create($anio, $mes, 1);
