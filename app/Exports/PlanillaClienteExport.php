@@ -7,6 +7,7 @@ use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
 use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Concerns\WithStrictNullComparison;
 use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Cell\Cell;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
@@ -16,29 +17,53 @@ use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 
 /** Formato detallado solicitado por el cliente (dos niveles de encabezado). */
-class PlanillaClienteExport extends DefaultValueBinder implements FromArray, ShouldAutoSize, WithCustomValueBinder, WithEvents
+class PlanillaClienteExport extends DefaultValueBinder implements FromArray, ShouldAutoSize, WithCustomValueBinder, WithEvents, WithStrictNullComparison
 {
-    public function __construct(private array $rows, private string $gratificacionTitulo) {}
+    public function __construct(private array $rows, private string $anioCorto) {}
 
+    /**
+     * Las 53 columnas visibles de la hoja del cliente, en su orden exacto.
+     * Los nombres se copian tal cual los escribe el (incluidas sus erratas:
+     * "DIAS TRBAJADOS", "INSENTIVOS", "descuemto") para que al comparar su
+     * Excel con el nuestro los encabezados coincidan.
+     */
     public function array(): array
     {
         $superior = [
-            'ITEM', 'APELLIDO Y NOMBRES', "FECHA DE\nNACIM.", 'DNI', "FECHA\nINGRESO", "FECHA\nDE CESE",
-            'GÉNERO', 'TIPO DE CONTRATO', 'CATEGORÍA OCUPACIONAL', 'ONP', 'SCTR', 'SENATI', 'COD AFP',
-            'ÁREA', 'CARGO', "SUELDO\nBÁSICO", 'ASIG. FAM.', 'MOV.', 'POR FUERA', 'TOTAL MENSUAL', 'DÍAS TRABAJADOS',
-            'DESCANSO MÉDICO', '', 'SUBSIDIO', '', 'ADELANTOS', '', '', '', 'VACACIONES', '', 'LICENCIA',
-            'LIQ. VACACIONES', '', 'CTS', '', '', 'LICENCIA HIJO ENFERMO', '', "TOTAL\nREM. NETA", "TOTAL\nMOVIL",
-            'DÍAS FALTOS', '', 'TARDANZAS', '', 'REINTEGRO', "SISTEMA DE\nPENSIONES", 'COMISIÓN AFP', '',
-            'ONP', 'AFP PRIMA', '', '', "DSCTO\nAFP", "RTA. 5TA\nCATEG.", $this->gratificacionTitulo,
-            'TOTAL A PAGAR', 'ESSALUD', 'SCTR PENSIÓN', 'SCTR SALUD', 'SVL', 'ADELANTOS', '',
+            'ITEM', 'APELLIDO Y NOMBRES', "FECHA DE\nNACIM.", 'DNI',
+            "SUELDO\nBASICO", 'ASIG FAM', 'MOV', 'TOTAL MENSUAL', "DIAS\nTRBAJADOS",
+            'DIAS FALTOS', '', 'SUBSIDIO', '', 'ADELANTOS', '', '',
+            'DESCANSO', '', 'VACACIONES', '',
+            'GRATIFICACIÓN JUL '.$this->anioCorto, 'GRATIFICACIÓN DIC '.$this->anioCorto, 'LICENCIA',
+            'TARDANZAS', '', "TOTAL\nREM\nNETA BASICA",
+            'HE', '', 'SABADOS', '', 'DOMINGO Y FERIADO', '', 'INSENTIVOS', '',
+            "TOTAL\nREM NETA X\nMOVILTAL",
+            "SISTEMA DE\nPENSIONES", '', '', 'ONP', 'AFP PRIMA', '', '',
+            "DSCTO\nAFP", 'descuemto', "RTA.\n5TA\nCATEG", "TOTAL\nNETO A\nPAGAR",
+            'ESSALUD', 'SCTR PENSIÓN', 'SCTR SALUD', 'SVL',
+            'ADELANTOS', 'REINTEGRO', "NETO A\nPAGAR",
         ];
-        $inferior = array_fill(0, 63, '');
-        foreach ([21=>'DÍAS',22=>'MONTO',23=>'DÍAS',24=>'MONTO',25=>'GRAT.',26=>"BONIF.\nGRAT.",27=>'VACACIONES',28=>'TOTAL',
-            29=>'DÍAS',30=>'MONTO',32=>'GRAT.',33=>'VAC.',34=>'MONTO',35=>'DÍAS',36=>'MONTO',37=>'DÍAS',38=>'MONTO',
-            41=>'CANT.',42=>'DESCUENTO',43=>'CANT.',44=>'DESCUENTO',47=>'TIPO',48=>'TASA',49=>'13%',50=>'10%',
-            51=>'COMISIÓN',52=>'PRIMA',57=>'9%',58=>'2.14%',60=>'DL 688',61=>'DESCONTADO',62=>'PAGADO'] as $index=>$label) {
+
+        $inferior = array_fill(0, 53, '');
+        foreach ([
+            9 => 'CANT', 10 => 'DESCUENTO',
+            11 => 'DIAS', 12 => 'MONTO',
+            13 => 'GRAT', 14 => "BONIFI\nGRAT", 15 => 'VACACIONES',
+            16 => 'DIAS', 17 => 'MONTO',
+            18 => 'DIAS', 19 => 'MONTO',
+            23 => 'CANT', 24 => 'DESCUENTO',
+            26 => 'HORAS', 27 => 'MONTO',
+            28 => 'DIAS', 29 => 'MONTO',
+            30 => 'DIAS', 31 => 'MONTO',
+            32 => 'POR PROD.', 33 => 'OTROS',
+            36 => 'COM',
+            38 => '13%', 39 => '10%', 40 => 'COMISI', 41 => 'PRIMA',
+            43 => "y AFP y\nONP",
+            46 => '9%', 47 => '2.14%', 49 => 'DL 688',
+        ] as $index => $label) {
             $inferior[$index] = $label;
         }
+
         return [$superior, $inferior, ...$this->rows];
     }
 
@@ -57,20 +82,20 @@ class PlanillaClienteExport extends DefaultValueBinder implements FromArray, Sho
         return [AfterSheet::class => function (AfterSheet $event) {
             $sheet = $event->sheet->getDelegate();
             $lastRow = count($this->rows) + 2;
-            $lastCol = 'BK';
+            $lastCol = 'BA';  // 53 columnas: A..BA
 
-            foreach (['A:U','AF:AF','AN:AO','AT:AU','BB:BE'] as $range) {
+            foreach (['A:I','U:W','Z:Z','AI:AI','AM:AM','AQ:AR','AS:AU','AV:AY','AZ:BA'] as $range) {
                 [$from,$to] = explode(':', $range);
                 for ($column=Coordinate::columnIndexFromString($from); $column<=Coordinate::columnIndexFromString($to); $column++) {
                     $letter = Coordinate::stringFromColumnIndex($column);
                     $sheet->mergeCells("{$letter}1:{$letter}2");
                 }
             }
-            foreach (['V1:W1','X1:Y1','Z1:AC1','AD1:AE1','AG1:AH1','AI1:AK1','AL1:AM1','AP1:AQ1','AR1:AS1','AV1:AW1','AY1:BA1','BJ1:BK1'] as $range) {
+            foreach (['J1:K1','L1:M1','N1:P1','Q1:R1','S1:T1','X1:Y1','AA1:AB1','AC1:AD1','AE1:AF1','AG1:AH1','AJ1:AL1','AN1:AP1'] as $range) {
                 $sheet->mergeCells($range);
             }
 
-            $sheet->freezePane('F3');
+            $sheet->freezePane('E3');
             $sheet->setAutoFilter("A2:{$lastCol}{$lastRow}");
             $sheet->getRowDimension(1)->setRowHeight(38);
             $sheet->getRowDimension(2)->setRowHeight(32);
@@ -88,19 +113,23 @@ class PlanillaClienteExport extends DefaultValueBinder implements FromArray, Sho
                     $sheet->getStyle("A{$row}:{$lastCol}{$row}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F4F8FB');
                 }
             }
-            foreach (['P','Q','R','S','T','W','Y','Z','AA','AB','AC','AE','AF','AG','AH','AI','AK','AM','AN','AO','AQ','AS','AT','AX','AY','AZ','BA','BB','BC','BD','BE','BF','BG','BH','BI','BJ','BK'] as $column) {
+            foreach (['E','F','G','H','K','M','N','O','P','R','T','U','V','W','Y','Z','AB','AD','AF','AG','AH','AI','AM','AN','AO','AP','AQ','AR','AS','AT','AU','AV','AW','AX','AY','AZ','BA'] as $column) {
                 $sheet->getStyle("{$column}3:{$column}{$lastRow}")->getNumberFormat()->setFormatCode('#,##0.00');
             }
-            foreach (['C','E','F'] as $column) {
+            // Tasas de AFP: 4 decimales, si no 1.37% se veria como 1%.
+            foreach (['AK', 'AL'] as $column) {
+                $sheet->getStyle("{$column}3:{$column}{$lastRow}")->getNumberFormat()->setFormatCode('0.0000');
+            }
+            foreach (['C'] as $column) {
                 $sheet->getStyle("{$column}3:{$column}{$lastRow}")->getNumberFormat()->setFormatCode('dd/mm/yyyy');
             }
-            $sheet->getStyle("BE3:BE{$lastRow}")->applyFromArray([
+            $sheet->getStyle("BA3:BA{$lastRow}")->applyFromArray([
                 'font'=>['bold'=>true,'color'=>['rgb'=>'1E6B33']],
                 'fill'=>['fillType'=>Fill::FILL_SOLID,'startColor'=>['rgb'=>'E2F0D9']],
             ]);
             $sheet->getStyle("D3:D{$lastRow}")->getNumberFormat()->setFormatCode('@');
             $sheet->getColumnDimension('B')->setWidth(36);
-            foreach (['H','I','N','O','AU'] as $column) $sheet->getColumnDimension($column)->setWidth(20);
+            $sheet->getColumnDimension('AJ')->setWidth(18);
         }];
     }
 }

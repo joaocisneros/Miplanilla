@@ -42,6 +42,12 @@ function eliminar(r) {
 
 const money = (v) => 'S/ ' + Number(v ?? 0).toLocaleString('es-PE', { minimumFractionDigits: 2 });
 const meses = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+// Como se vera el momento del cobro en la vista previa y en el listado.
+const etiquetaQuincena = computed(() => {
+    if (form.quincena === 1) return '1ra quincena';
+    if (form.quincena === 2) return '2da quincena';
+    return '2da quincena (todo el mes)';
+});
 const inp = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm';
 
 // Vista previa EXACTA de lo que se va a registrar (mismo cálculo que el
@@ -174,14 +180,19 @@ const previewCuotas = computed(() => {
                 <div v-if="previewCuotas.length" class="md:col-span-2 rounded-lg border border-fuchsia-200 bg-fuchsia-50/60 p-3">
                     <p class="mb-1.5 text-xs font-semibold uppercase tracking-wide text-fuchsia-700">Así se descontará en la planilla</p>
                     <div v-if="form.tipo === 'adelanto'" class="text-sm text-gray-800">
-                        Un solo descuento de <b>{{ money(previewCuotas[0].monto) }}</b> en <b>{{ meses[previewCuotas[0].mes] }} {{ previewCuotas[0].anio }}</b>.
+                        Un solo descuento de <b>{{ money(previewCuotas[0].monto) }}</b> en
+                        <b>{{ meses[previewCuotas[0].mes] }} {{ previewCuotas[0].anio }}</b>,
+                        <b>{{ etiquetaQuincena }}</b>.
                     </div>
                     <ul v-else class="space-y-0.5 text-sm text-gray-800">
                         <li v-for="c in previewCuotas" :key="c.n" class="flex items-center justify-between">
-                            <span>Cuota {{ c.n }}/{{ c.de }} — {{ meses[c.mes] }} {{ c.anio }}</span>
+                            <span>Cuota {{ c.n }}/{{ c.de }} — {{ meses[c.mes] }} {{ c.anio }}, {{ etiquetaQuincena }}</span>
                             <span class="font-semibold tabular-nums">{{ money(c.monto) }}</span>
                         </li>
                     </ul>
+                    <p v-if="form.quincena === null" class="mt-1.5 text-xs text-gray-500">
+                        Al no fijar quincena se cobra en la 2da, o al cierre del mes si la planilla es mensual.
+                    </p>
                 </div>
 
                 <div class="flex items-center justify-end gap-3 md:col-span-2">
