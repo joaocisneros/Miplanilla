@@ -50,7 +50,7 @@ function filtrar() {
 const mostrar = ref(false);
 const sel = ref(null);
 const form = useForm({ empresa_id: '', employee_id: '', filas: [] });
-const trabajado = (e) => ['NORMAL','TRABAJO_SABADO','TRABAJO_DOMINGO','TRABAJO_FERIADO'].includes(e);
+const trabajado = (e) => ['NORMAL','REMOTO','TRABAJO_SABADO','TRABAJO_DOMINGO','TRABAJO_FERIADO'].includes(e);
 const diaSemana = (f) => ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'][new Date(f + 'T00:00:00').getDay()];
 // El backend/planilla usa horas_extra en horas decimales; en pantalla se escribe en minutos.
 const horasExtraMin = (d) => (d.horas_extra ? Math.round(d.horas_extra * 60) : 0);

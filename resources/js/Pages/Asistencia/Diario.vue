@@ -5,6 +5,7 @@ import { computed, nextTick, ref } from 'vue';
 
 const props = defineProps({
     fecha: String,
+    resumenImportado: { type: Boolean, default: false },
     feriado: { type: String, default: null },
     filas: { type: Array, default: () => [] },
     filtros: { type: Object, default: () => ({ empresa_id: null, sede_id: null }) },
@@ -27,7 +28,10 @@ const form = useForm({
     filas: props.filas.map((f) => ({ ...f })),
 });
 
-const trabajado = (estado) => ['NORMAL', 'TRABAJO_SABADO', 'TRABAJO_DOMINGO', 'TRABAJO_FERIADO'].includes(estado);
+const trabajado = (estado) => ['NORMAL', 'REMOTO', 'TRABAJO_SABADO', 'TRABAJO_DOMINGO', 'TRABAJO_FERIADO'].includes(estado);
+// En remoto no hay biometrico: el dia se paga completo pero las horas no se
+// editan, se asume que cumplio su turno.
+const editaHoras = (estado) => trabajado(estado) && estado !== 'REMOTO';
 
 // Convierte "HH:mm" a minutos del día
 function aMin(hhmm) {
@@ -59,13 +63,22 @@ function minTexto(min) {
 
 function onEstadoChange(f) {
     f.observacion = f.estado === 'NORMAL' ? '' : (props.estados[f.estado] || '');
+    // En remoto no hay marcacion del biometrico: se asume que cumplio su turno,
+    // asi que se completan entrada y salida con su horario y no sale tardanza.
+    if (f.estado === 'REMOTO') {
+        f.entrada = f.turno_entrada || '';
+        f.salida = f.turno_salida || '';
+        f.minutos_tarde = 0;
+        f.horas_extra = 0;
+        f.horas_extra_aprobadas = false;
+    }
     recalc(f);
 }
 
 // Recalcula tardanza (min) y horas extra según el horario del turno y las horas marcadas.
 // Tardanza y horas extra son totalmente independientes: una no compensa a la otra.
 function recalc(f) {
-    if (!trabajado(f.estado)) { f.minutos_tarde = 0; f.horas_extra = 0; f.horas_extra_aprobadas = false; return; }
+    if (!editaHoras(f.estado)) { f.minutos_tarde = 0; f.horas_extra = 0; f.horas_extra_aprobadas = false; return; }
     const ent = aMin(f.entrada), entTurno = aMin(f.turno_entrada);
     if (ent !== null && entTurno !== null) {
         const limite = entTurno + (f.turno_tolerancia || 0);
@@ -182,6 +195,13 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                     </div>
                 </div>
 
+                <div v-if="resumenImportado" class="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+                    <b>⚠️ Este periodo se cargó con un cuadro resumen importado.</b>
+                    La planilla toma sus días y tardanzas de ese resumen, no de esta pantalla.
+                    Lo que cambies aquí <b>no se reflejará en el cálculo</b> mientras el resumen exista.
+                    Para corregir el periodo, vuelve a importar el resumen con los datos correctos.
+                </div>
+
                 <!-- Modalidad: el cliente no quiere ver Planilla y Honorarios juntos -->
                 <div class="flex gap-2">
                     <button
@@ -269,17 +289,17 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                                             <option v-for="(label, key) in estados" :key="key" :value="key">{{ label }}</option>
                                         </select>
                                     </td>
-                                    <td class="px-4 py-2"><input v-model="f.entrada" @input="recalc(f)" type="time" :disabled="!trabajado(f.estado)" :class="[inp, !trabajado(f.estado) && 'bg-gray-100']" /></td>
-                                    <td class="px-4 py-2"><input v-model="f.salida" @input="recalc(f)" type="time" :disabled="!trabajado(f.estado)" :class="[inp, !trabajado(f.estado) && 'bg-gray-100']" /></td>
+                                    <td class="px-4 py-2"><input v-model="f.entrada" @input="recalc(f)" type="time" :disabled="!editaHoras(f.estado)" :class="[inp, !editaHoras(f.estado) && 'bg-gray-100']" /></td>
+                                    <td class="px-4 py-2"><input v-model="f.salida" @input="recalc(f)" type="time" :disabled="!editaHoras(f.estado)" :class="[inp, !editaHoras(f.estado) && 'bg-gray-100']" /></td>
                                     <td class="px-4 py-2">
-                                        <input v-model.number="f.minutos_tarde" type="number" min="0" max="600" :disabled="!trabajado(f.estado) || !!f.entrada" :title="f.entrada ? 'Se calcula solo desde la hora de entrada' : ''" :class="[inp, (!trabajado(f.estado) || !!f.entrada) && 'bg-gray-100']" />
+                                        <input v-model.number="f.minutos_tarde" type="number" min="0" max="600" :disabled="!editaHoras(f.estado) || !!f.entrada" :title="f.entrada ? 'Se calcula solo desde la hora de entrada' : ''" :class="[inp, (!editaHoras(f.estado) || !!f.entrada) && 'bg-gray-100']" />
                                         <span v-if="f.minutos_tarde" class="mt-0.5 block text-xs text-gray-400">{{ minTexto(f.minutos_tarde) }}</span>
                                     </td>
                                     <td class="px-4 py-2">
-                                        <input :value="horasExtraMin(f)" @input="setHorasExtraMin(f, $event.target.valueAsNumber || 0)" type="number" min="0" max="720" :disabled="!trabajado(f.estado) || !!f.salida" :title="f.salida ? 'Se calcula solo desde la hora de salida' : ''" :class="[inp, (!trabajado(f.estado) || !!f.salida) && 'bg-gray-100']" />
+                                        <input :value="horasExtraMin(f)" @input="setHorasExtraMin(f, $event.target.valueAsNumber || 0)" type="number" min="0" max="720" :disabled="!editaHoras(f.estado) || !!f.salida" :title="f.salida ? 'Se calcula solo desde la hora de salida' : ''" :class="[inp, (!editaHoras(f.estado) || !!f.salida) && 'bg-gray-100']" />
                                         <span v-if="horasExtraMin(f)" class="mt-0.5 block text-xs text-gray-400">{{ minTexto(horasExtraMin(f)) }}</span>
                                     </td>
-                                    <td class="px-4 py-2 text-center"><input v-model="f.horas_extra_aprobadas" type="checkbox" :disabled="!trabajado(f.estado) || !f.horas_extra" class="rounded" /></td>
+                                    <td class="px-4 py-2 text-center"><input v-model="f.horas_extra_aprobadas" type="checkbox" :disabled="!editaHoras(f.estado) || !f.horas_extra" class="rounded" /></td>
                                     <td class="px-4 py-2"><input v-model="f.observacion" type="text" maxlength="255" :class="inp" placeholder="opcional" /></td>
                                 </tr>
                                 <tr v-if="form.filas.length === 0">

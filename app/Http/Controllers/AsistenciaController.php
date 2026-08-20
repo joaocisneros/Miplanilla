@@ -116,8 +116,18 @@ class AsistenciaController extends Controller
             });
         }
 
+        // Si el periodo de esta fecha ya tiene un CUADRO RESUMEN importado, el motor
+        // de planilla usa ese resumen y NO el registro diario. Lo que se edite aqui
+        // no llegaria al calculo, asi que hay que avisarlo en pantalla.
+        $f = Carbon::parse($fecha);
+        $resumenImportado = $empresaId && \App\Models\AsistenciaResumen::where('empresa_id', $empresaId)
+            ->where('anio', $f->year)->where('mes', $f->month)
+            ->where(fn ($q) => $q->where('quincena', $f->day <= 15 ? 1 : 2)->orWhereNull('quincena'))
+            ->exists();
+
         return Inertia::render('Asistencia/Diario', [
             'fecha' => $fecha,
+            'resumenImportado' => (bool) $resumenImportado,
             'feriado' => \App\Models\Feriado::whereDate('fecha', $fecha)->value('nombre'),
             'filas' => $filas,
             'filtros' => ['empresa_id' => $empresaId, 'sede_id' => $sedeId, 'modalidad' => $modalidad],
@@ -159,7 +169,7 @@ class AsistenciaController extends Controller
             $fin = (clone $base)->endOfMonth();
         }
 
-        $trabajadoEstados = ['NORMAL', 'TRABAJO_SABADO', 'TRABAJO_DOMINGO', 'TRABAJO_FERIADO'];
+        $trabajadoEstados = ['NORMAL', 'REMOTO', 'TRABAJO_SABADO', 'TRABAJO_DOMINGO', 'TRABAJO_FERIADO'];
 
         // Un usuario con SOLO el rol EMPLEADO únicamente ve su propio resumen.
         $user = $request->user();
@@ -272,7 +282,7 @@ class AsistenciaController extends Controller
 
         DB::transaction(function () use ($data) {
             foreach ($data['filas'] as $f) {
-                $trabajado = in_array($f['estado'], ['NORMAL', 'TRABAJO_SABADO', 'TRABAJO_DOMINGO', 'TRABAJO_FERIADO'], true);
+                $trabajado = in_array($f['estado'], ['NORMAL', 'REMOTO', 'TRABAJO_SABADO', 'TRABAJO_DOMINGO', 'TRABAJO_FERIADO'], true);
                 Attendance::updateOrCreate(
                     ['employee_id' => $data['employee_id'], 'fecha' => $f['fecha']],
                     [
@@ -318,7 +328,7 @@ class AsistenciaController extends Controller
         DB::transaction(function () use ($data, $turnos, $esSabado) {
             foreach ($data['filas'] as $f) {
                 // Solo guardamos tardanza/HE cuando corresponde a un día efectivamente trabajado.
-                $trabajado = in_array($f['estado'], ['NORMAL', 'TRABAJO_SABADO', 'TRABAJO_DOMINGO', 'TRABAJO_FERIADO'], true);
+                $trabajado = in_array($f['estado'], ['NORMAL', 'REMOTO', 'TRABAJO_SABADO', 'TRABAJO_DOMINGO', 'TRABAJO_FERIADO'], true);
 
                 // Si se ingresó la hora de entrada y hay turno, se calcula la tardanza
                 // automáticamente (entrada − (hora del turno + tolerancia)).
@@ -370,6 +380,7 @@ class AsistenciaController extends Controller
         // el paréntesis, así los Excel viejos ("Falta") siguen importando.
         return [
             'NORMAL' => 'Presente',
+            'REMOTO' => 'Remoto',
             'FALTA' => 'Falta (descuenta el día)',
             'FALTA_JUSTIFICADA' => 'Falta justificada (pagada)',
             'VACACIONES' => 'Vacaciones',
@@ -826,7 +837,7 @@ class AsistenciaController extends Controller
             $labelACodigo[$this->baseLabel($label)] = $codigo;
         }
         $want = ['DNI', 'FECHA', 'ESTADO', 'ENTRADA', 'SALIDA', 'HE APROB', 'OBSERVACION'];
-        $trabajadoEstados = ['NORMAL', 'TRABAJO_SABADO', 'TRABAJO_DOMINGO', 'TRABAJO_FERIADO'];
+        $trabajadoEstados = ['NORMAL', 'REMOTO', 'TRABAJO_SABADO', 'TRABAJO_DOMINGO', 'TRABAJO_FERIADO'];
         $turnos = [];
         $procesados = 0;
         $noEmp = [];
