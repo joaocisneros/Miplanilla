@@ -4,7 +4,6 @@ namespace App\Exports;
 
 use Maatwebsite\Excel\DefaultValueBinder;
 use Maatwebsite\Excel\Concerns\FromArray;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithStrictNullComparison;
@@ -17,7 +16,7 @@ use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 
 /** Formato detallado solicitado por el cliente (dos niveles de encabezado). */
-class PlanillaClienteExport extends DefaultValueBinder implements FromArray, ShouldAutoSize, WithCustomValueBinder, WithEvents, WithStrictNullComparison
+class PlanillaClienteExport extends DefaultValueBinder implements FromArray, WithCustomValueBinder, WithEvents, WithStrictNullComparison
 {
     public function __construct(private array $rows, private string $anioCorto) {}
 
@@ -84,14 +83,14 @@ class PlanillaClienteExport extends DefaultValueBinder implements FromArray, Sho
             $lastRow = count($this->rows) + 2;
             $lastCol = 'BA';  // 53 columnas: A..BA
 
-            foreach (['A:I','U:W','Z:Z','AI:AI','AQ:AQ','AS:AT','AW:AW','AY:BA'] as $range) {
+            foreach (['A:I','U:W','Z:Z','AI:AJ','AQ:AQ','AS:AT','AZ:BA'] as $range) {
                 [$from,$to] = explode(':', $range);
                 for ($column=Coordinate::columnIndexFromString($from); $column<=Coordinate::columnIndexFromString($to); $column++) {
                     $letter = Coordinate::stringFromColumnIndex($column);
                     $sheet->mergeCells("{$letter}1:{$letter}2");
                 }
             }
-            foreach (['J1:K1','L1:M1','N1:P1','Q1:R1','S1:T1','X1:Y1','AA1:AB1','AC1:AD1','AE1:AF1','AG1:AH1','AJ1:AL1','AN1:AP1'] as $range) {
+            foreach (['J1:K1','L1:M1','N1:P1','Q1:R1','S1:T1','X1:Y1','AA1:AB1','AC1:AD1','AN1:AP1'] as $range) {
                 $sheet->mergeCells($range);
             }
 
@@ -134,7 +133,17 @@ class PlanillaClienteExport extends DefaultValueBinder implements FromArray, Sho
             ]);
             $sheet->getStyle("D3:D{$lastRow}")->getNumberFormat()->setFormatCode('@');
             $sheet->getColumnDimension('B')->setWidth(36);
-            $sheet->getColumnDimension('AJ')->setWidth(18);
+            // Anchos parejos: el encabezado va con ajuste de texto y filas altas,
+            // asi que 10 alcanza para los importes. Se ensanchan solo las columnas
+            // de texto largo.
+            for ($col = 1; $col <= 53; $col++) {
+                $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($col))->setWidth(10);
+            }
+            $sheet->getColumnDimension('A')->setWidth(6);   // ITEM
+            $sheet->getColumnDimension('B')->setWidth(36);  // APELLIDO Y NOMBRES
+            $sheet->getColumnDimension('C')->setWidth(12);  // FECHA DE NACIM.
+            $sheet->getColumnDimension('D')->setWidth(12);  // DNI
+            $sheet->getColumnDimension('AJ')->setWidth(18); // SISTEMA DE PENSIONES
         }];
     }
 }
