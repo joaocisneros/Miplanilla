@@ -87,7 +87,7 @@ class ImportadorAsistenciaCliente
         $resumenes = 0;
         foreach (array_keys($periodos) as $clave) {
             [$employeeId, $anio, $mes, $quincena] = explode('|', $clave);
-            $this->recalcularResumen($empresaId, (int) $employeeId, (int) $anio, (int) $mes, (int) $quincena);
+            $this->recalcularResumen($empresaId, (int) $employeeId, (int) $anio, (int) $mes, (int) $quincena, datosCompletos: true);
             $resumenes++;
         }
 
@@ -109,7 +109,7 @@ class ImportadorAsistenciaCliente
      * los dias que no se pagan. No se cuentan los registros existentes, porque el
      * cuadro solo trae los dias habiles y los domingos igual se pagan.
      */
-    public function recalcularResumen(int $empresaId, int $employeeId, int $anio, int $mes, int $quincena): void
+    public function recalcularResumen(int $empresaId, int $employeeId, int $anio, int $mes, int $quincena, bool $datosCompletos = false): void
     {
         $base = Carbon::create($anio, $mes, 1);
         $inicio = $quincena === 1 ? $base->copy()->startOfMonth() : $base->copy()->day(16);
@@ -120,7 +120,27 @@ class ImportadorAsistenciaCliente
             ->whereBetween('fecha', [$inicio->toDateString(), $fin->toDateString()])
             ->get();
 
-        if ($registros->isEmpty()) {
+        $resumen = AsistenciaResumen::where('empresa_id', $empresaId)->where('employee_id', $employeeId)
+            ->where('anio', $anio)->where('mes', $mes)->where('quincena', $quincena)->first();
+
+        // Al importar el detalle sabemos que los dias vienen completos, asi que se
+        // rehace siempre. Al corregir a mano hay que ser prudente: en un periodo
+        // cargado solo con totales el diario esta casi vacio, y recalcular pondria
+        // los dias al maximo borrando las faltas y tardanzas que vinieron del Excel.
+        if (! $datosCompletos) {
+            if ($registros->isEmpty()) {
+                return;
+            }
+
+            // Sin resumen previo no hace falta crear uno: el motor lee el diario.
+            if (! $resumen) {
+                return;
+            }
+
+            if ($registros->count() < (int) ceil($diasPeriodo / 2)) {
+                return;
+            }
+        } elseif ($registros->isEmpty()) {
             return;
         }
 

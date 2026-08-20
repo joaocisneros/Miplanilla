@@ -119,11 +119,20 @@ class AsistenciaController extends Controller
         // Si el periodo de esta fecha ya tiene un CUADRO RESUMEN importado, el motor
         // de planilla usa ese resumen y NO el registro diario. Lo que se edite aqui
         // no llegaria al calculo, asi que hay que avisarlo en pantalla.
+        // El aviso solo aplica si el periodo tiene resumen y el registro diario NO
+        // lo cubre: ahi la planilla usa el resumen y editar aqui no cambia nada.
+        // Si el detalle diario ya esta cargado, guardar rehace el resumen y si llega.
         $f = Carbon::parse($fecha);
-        $resumenImportado = $empresaId && \App\Models\AsistenciaResumen::where('empresa_id', $empresaId)
+        $inicio = $f->day <= 15 ? $f->copy()->startOfMonth() : $f->copy()->day(16);
+        $fin = $f->day <= 15 ? $f->copy()->day(15) : $f->copy()->endOfMonth();
+        $tieneResumen = $empresaId && \App\Models\AsistenciaResumen::where('empresa_id', $empresaId)
             ->where('anio', $f->year)->where('mes', $f->month)
             ->where(fn ($q) => $q->where('quincena', $f->day <= 15 ? 1 : 2)->orWhereNull('quincena'))
             ->exists();
+        $diasCargados = $empresaId ? \App\Models\Attendance::where('empresa_id', $empresaId)
+            ->whereBetween('fecha', [$inicio->toDateString(), $fin->toDateString()])
+            ->distinct()->count('fecha') : 0;
+        $resumenImportado = $tieneResumen && $diasCargados < (int) ceil(($inicio->diffInDays($fin) + 1) / 2);
 
         return Inertia::render('Asistencia/Diario', [
             'fecha' => $fecha,

@@ -196,10 +196,10 @@ const selectCls = 'rounded-md border-gray-300 py-1.5 text-sm';
                 </div>
 
                 <div v-if="resumenImportado" class="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-                    <b>⚠️ Este periodo se cargó con un cuadro resumen importado.</b>
-                    La planilla toma sus días y tardanzas de ese resumen, no de esta pantalla.
-                    Lo que cambies aquí <b>no se reflejará en el cálculo</b> mientras el resumen exista.
-                    Para corregir el periodo, vuelve a importar el resumen con los datos correctos.
+                    <b>⚠️ Este periodo se cargó solo con totales, sin el detalle día a día.</b>
+                    La planilla toma sus días y tardanzas de esos totales, así que lo que cambies
+                    aquí <b>no se reflejará en el cálculo</b>.
+                    Importa el detalle diario del periodo y a partir de ahí tus correcciones sí cuentan.
                 </div>
 
                 <!-- Modalidad: el cliente no quiere ver Planilla y Honorarios juntos -->
