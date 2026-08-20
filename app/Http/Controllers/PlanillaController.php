@@ -264,6 +264,9 @@ class PlanillaController extends Controller
 
         $detalles = $payroll->detalles->filter(fn ($d) => ($d->modalidad ?? 'planilla') !== 'honorarios');
         $n = fn ($v) => round((float) $v, 2);
+        // El cliente prefiere la celda vacia antes que un 0.00: asi de un vistazo
+        // se ve solo lo que realmente tiene monto. null hace que no se escriba.
+        $b = fn ($v) => ((float) $v) == 0.0 ? null : round((float) $v, 2);
         $employeeIds = $detalles->pluck('employee_id')->all();
         $resumenQuery = \App\Models\AsistenciaResumen::where('empresa_id', $payroll->empresa_id)
             ->whereIn('employee_id', $employeeIds)
@@ -325,61 +328,61 @@ class PlanillaController extends Controller
             $totalNeto = $n($g['bloques']['suma_neto'] ?? ($baseAfecta + $movQuincenal - (float) $d->pension_total - (float) $d->renta_5ta));
 
             // 53 columnas en el orden exacto de la hoja del cliente.
+            // Los importes en cero van vacios; solo aparece lo que tiene valor.
             $rows[] = [
                 /*  1 ITEM                */ $i++,
                 /*  2 APELLIDO Y NOMBRES  */ $e?->nombre_completo,
                 /*  3 FECHA DE NACIM.     */ $e?->fecha_nacimiento?->toDateString(),
                 /*  4 DNI                 */ (string) $e?->numero_documento,
-                /*  5 SUELDO BASICO       */ $n($c?->sueldo_basico ?? 0),
-                /*  6 ASIG FAM            */ $asigMensual,
-                /*  7 MOV                 */ $movMensual,
-                /*  8 TOTAL MENSUAL       */ $n(($c?->sueldo_basico ?? 0) + $asigMensual + $movMensual),
-                /*  9 DIAS TRBAJADOS      */ $asis['dias_trabajados'] ?? ($g['dias_trabajados'] ?? 0),
-                /* 10 DIAS FALTOS CANT    */ $asis['faltas'] ?? 0,
-                /* 11 DIAS FALTOS DESCTO  */ $n($asis['descuento_faltas'] ?? 0),
-                /* 12 SUBSIDIO DIAS       */ $contar('SUBSIDIO'),
-                /* 13 SUBSIDIO MONTO      */ $n($ing['subsidio'] ?? 0),
-                /* 14 ADELANTO GRAT       */ 0, // pendiente: no se registra por concepto
-                /* 15 ADELANTO BONIF GRAT */ 0, // pendiente
-                /* 16 ADELANTO VACACIONES */ 0, // pendiente
-                /* 17 DESCANSO DIAS       */ $contar('DESCANSO_MEDICO'),
-                /* 18 DESCANSO MONTO      */ 0, // pendiente: no se separa del subsidio
-                /* 19 VACACIONES DIAS     */ $vacDias,
-                /* 20 VACACIONES MONTO    */ $n($ing['vacaciones'] ?? 0),
-                /* 21 GRATIFICACION JUL   */ $gratJul,
-                /* 22 GRATIFICACION DIC   */ $gratDic,
-                /* 23 LICENCIA            */ $n($ing['licencia'] ?? 0),
-                /* 24 TARDANZAS CANT      */ $asis['minutos_tarde'] ?? 0,
-                /* 25 TARDANZAS DESCUENTO */ $n($desc['tardanza'] ?? 0),
-                /* 26 TOTAL REM NETA BAS. */ $baseAfecta,
-                /* 27 HE HORAS            */ $resumenUsado->sum('horas_extra'),
-                /* 28 HE MONTO            */ $n($ing['horas_extra'] ?? 0),
-                /* 29 SABADOS DIAS        */ $resumenUsado->sum('sabado'),
-                /* 30 SABADOS MONTO       */ $n($ing['sabado'] ?? 0),
-                /* 31 DOM/FER DIAS        */ $resumenUsado->sum('feriados_domingos'),
-                /* 32 DOM/FER MONTO       */ $n($ing['domingo_feriado'] ?? 0),
-                /* 33 INSENTIVOS PROD.    */ 0, // pendiente: hoy no se separa
-                /* 34 INSENTIVOS OTROS    */ $n($ing['incentivos'] ?? 0),
-                /* 35 TOTAL REM X MOVIL   */ $movQuincenal,
-                /* 36 SISTEMA PENSIONES   */ trim($sistema),
-                // Las tasas van con 4 decimales: redondear a 2 convertiria 1.37% en 1%.
-                /* 37 COM                 */ round((float) ($penDet['tasa_comision'] ?? 0), 4),
-                /* 38 (sin titulo) PRIMA  */ round((float) ($penDet['tasa_prima'] ?? 0), 4),
-                /* 39 ONP 13%             */ $sistemaBase === 'ONP' ? $afpAporte : 0,
-                /* 40 AFP 10%             */ $sistemaBase === 'AFP' ? $afpAporte : 0,
-                /* 41 AFP COMISION        */ $afpComision,
-                /* 42 AFP PRIMA           */ $afpPrima,
-                /* 43 DSCTO AFP           */ $sistemaBase === 'AFP' ? $n($d->pension_total) : 0,
-                /* 44 DESCUENTO AFP Y ONP */ $n($d->pension_total),
-                /* 45 RTA. 5TA CATEG      */ $n($desc['renta_5ta'] ?? 0),
-                /* 46 TOTAL NETO A PAGAR  */ $totalNeto,
-                /* 47 ESSALUD 9%          */ $n($ap['essalud'] ?? 0),
-                /* 48 SCTR PENSION        */ $n($ap['sctr_pension'] ?? 0),
-                /* 49 SCTR SALUD          */ $n($ap['sctr_salud'] ?? 0),
-                /* 50 SVL DL 688          */ $n($ap['vida_ley'] ?? 0),
-                /* 51 ADELANTOS           */ $adelanto,
-                /* 52 REINTEGRO           */ $n($g['reintegros'] ?? 0),
-                /* 53 NETO A PAGAR        */ $n($d->neto),
+                /*  5 SUELDO BASICO       */ $b($c?->sueldo_basico ?? 0),
+                /*  6 ASIG FAM            */ $b($asigMensual),
+                /*  7 MOV                 */ $b($movMensual),
+                /*  8 TOTAL MENSUAL       */ $b(($c?->sueldo_basico ?? 0) + $asigMensual + $movMensual),
+                /*  9 DIAS TRBAJADOS      */ $b($asis['dias_trabajados'] ?? ($g['dias_trabajados'] ?? 0)),
+                /* 10 DIAS FALTOS CANT    */ $b($asis['faltas'] ?? 0),
+                /* 11 DIAS FALTOS DESCTO  */ $b($asis['descuento_faltas'] ?? 0),
+                /* 12 SUBSIDIO DIAS       */ $b($contar('SUBSIDIO')),
+                /* 13 SUBSIDIO MONTO      */ $b($ing['subsidio'] ?? 0),
+                /* 14 ADELANTO GRAT       */ null, // pendiente: no se registra por concepto
+                /* 15 ADELANTO BONIF GRAT */ null, // pendiente
+                /* 16 ADELANTO VACACIONES */ null, // pendiente
+                /* 17 DESCANSO DIAS       */ $b($contar('DESCANSO_MEDICO')),
+                /* 18 DESCANSO MONTO      */ null, // pendiente: no se separa del subsidio
+                /* 19 VACACIONES DIAS     */ $b($vacDias),
+                /* 20 VACACIONES MONTO    */ $b($ing['vacaciones'] ?? 0),
+                /* 21 GRATIFICACION JUL   */ $b($gratJul),
+                /* 22 GRATIFICACION DIC   */ $b($gratDic),
+                /* 23 LICENCIA            */ $b($ing['licencia'] ?? 0),
+                /* 24 TARDANZAS CANT      */ $b($asis['minutos_tarde'] ?? 0),
+                /* 25 TARDANZAS DESCUENTO */ $b($desc['tardanza'] ?? 0),
+                /* 26 TOTAL REM NETA BAS. */ $b($baseAfecta),
+                /* 27 HE HORAS            */ $b($resumenUsado->sum('horas_extra')),
+                /* 28 HE MONTO            */ $b($ing['horas_extra'] ?? 0),
+                /* 29 SABADOS DIAS        */ $b($resumenUsado->sum('sabado')),
+                /* 30 SABADOS MONTO       */ $b($ing['sabado'] ?? 0),
+                /* 31 DOM/FER DIAS        */ $b($resumenUsado->sum('feriados_domingos')),
+                /* 32 DOM/FER MONTO       */ $b($ing['domingo_feriado'] ?? 0),
+                /* 33 INSENTIVOS PROD.    */ null, // pendiente: hoy no se separa
+                /* 34 INSENTIVOS OTROS    */ $b($ing['incentivos'] ?? 0),
+                /* 35 TOTAL REM X MOVIL   */ $b($movQuincenal),
+                /* 36 SISTEMA PENSIONES   */ trim($sistema) ?: null,
+                /* 37 COM                 */ ((float) ($penDet['tasa_comision'] ?? 0)) == 0.0 ? null : round((float) $penDet['tasa_comision'], 4),
+                /* 38 (sin titulo) PRIMA  */ ((float) ($penDet['tasa_prima'] ?? 0)) == 0.0 ? null : round((float) $penDet['tasa_prima'], 4),
+                /* 39 ONP 13%             */ $sistemaBase === 'ONP' ? $b($afpAporte) : null,
+                /* 40 AFP 10%             */ $sistemaBase === 'AFP' ? $b($afpAporte) : null,
+                /* 41 AFP COMISION        */ $b($afpComision),
+                /* 42 AFP PRIMA           */ $b($afpPrima),
+                /* 43 DSCTO AFP           */ $sistemaBase === 'AFP' ? $b($d->pension_total) : null,
+                /* 44 DESCUENTO AFP Y ONP */ $b($d->pension_total),
+                /* 45 RTA. 5TA CATEG      */ $b($desc['renta_5ta'] ?? 0),
+                /* 46 TOTAL NETO A PAGAR  */ $b($totalNeto),
+                /* 47 ESSALUD 9%          */ $b($ap['essalud'] ?? 0),
+                /* 48 SCTR PENSION        */ $b($ap['sctr_pension'] ?? 0),
+                /* 49 SCTR SALUD          */ $b($ap['sctr_salud'] ?? 0),
+                /* 50 SVL DL 688          */ $b($ap['vida_ley'] ?? 0),
+                /* 51 ADELANTOS           */ $b($adelanto),
+                /* 52 REINTEGRO           */ $b($g['reintegros'] ?? 0),
+                /* 53 NETO A PAGAR        */ $b($d->neto),
             ];
         }
 
